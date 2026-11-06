@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GRASSReport — {{caseId}}</title>
+  <style>
+    :root {
+      --color-page: #ffffff;
+      --color-text: #111827;
+      --color-muted: #6b7280;
+      --color-border: #e5e7eb;
+      --color-accent: #1e40af;
+      --conf-verified: #d1fae5;
+      --conf-high: #dbeafe;
+      --conf-medium: #fef3c7;
+      --conf-low: #f3f4f6;
+      --conf-unverified: #fee2e2;
+      --font-sans: system-ui, "Segoe UI", Roboto, sans-serif;
+      --font-mono: ui-monospace, "Cascadia Code", monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: var(--font-sans);
+      color: var(--color-text);
+      background: var(--color-page);
+      font-size: 11px;
+      line-height: 1.45;
+      margin: 0;
+    }
+    h1 { font-size: 22px; margin: 0 0 8px; color: var(--color-accent); }
+    h2 { font-size: 14px; margin: 24px 0 8px; border-bottom: 1px solid var(--color-border); padding-bottom: 4px; }
+    .muted { color: var(--color-muted); font-size: 10px; }
+    section { page-break-inside: avoid; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 10px; }
+    th, td { border: 1px solid var(--color-border); padding: 6px 8px; text-align: left; vertical-align: top; }
+    th { background: #f9fafb; font-weight: 600; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 600; }
+    .sev-high { background: #fecaca; color: #7f1d1d; }
+    .sev-med { background: #fde68a; color: #78350f; }
+    .conf-VERIFIED { background: var(--conf-verified); }
+    .conf-HIGH { background: var(--conf-high); }
+    .conf-MEDIUM { background: var(--conf-medium); }
+    .conf-LOW { background: var(--conf-low); }
+    .conf-UNVERIFIED { background: var(--conf-unverified); font-style: italic; }
+    .victim-box {
+      font-family: var(--font-mono);
+      white-space: pre-wrap;
+      background: #fafafa;
+      border: 1px solid var(--color-border);
+      padding: 12px;
+      font-size: 10px;
+    }
+    @media print {
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <section data-section="cover">
+    <h1>GRASSReport / 1.0</h1>
+    <p class="muted">Government Reporting &amp; Analytics for Cybercrime — Confidential</p>
+    <p><strong>Case:</strong> {{caseId}}</p>
+    <p><strong>Generated:</strong> {{generatedAt}}</p>
+    <p><strong>Analyst:</strong> {{{analystName}}} <span class="muted">(Badge {{{analystId}}})</span></p>
+    <p><strong>Incident window:</strong> {{incidentStart}} — {{incidentEnd}}</p>
+    <p><strong>Scam category:</strong> {{scamCategory}}</p>
+    <p><strong>Total loss (INR):</strong> ₹{{totalLoss}}</p>
+  </section>
+
+  <section data-section="hash-manifest">
+    <h2>Evidence hash manifest</h2>
+    <table>
+      <thead>
+        <tr><th>Filename</th><th>SHA-256</th><th>Size (bytes)</th><th>Ingested</th></tr>
+      </thead>
+      <tbody>
+        {{#evidenceFiles}}
+        <tr>
+          <td>{{fileName}}</td>
+          <td style="word-break:break-all;font-family:var(--font-mono);font-size:9px;">{{sha256}}</td>
+          <td>{{fileSizeBytes}}</td>
+          <td>{{ingestedAtDisplay}}</td>
+        </tr>
+        {{/evidenceFiles}}
+      </tbody>
+    </table>
+  </section>
+
+  <section data-section="executive-summary">
+    <h2>Executive summary</h2>
+    <p>{{{executiveSummary}}}</p>
+  </section>
+
+  <section data-section="victim-statement">
+    <h2>Victim statement</h2>
+    <p class="muted">Verbatim — unmodified from intake</p>
+    <div class="victim-box">{{{victimStatement}}}</div>
+  </section>
+
+  <section data-section="timeline">
+    <h2>Timeline</h2>
+    <table>
+      <thead>
+        <tr><th>When</th><th>Event</th><th>Ref</th></tr>
+      </thead>
+      <tbody>
+        {{#timeline}}
+        <tr>
+          <td>{{tsDisplay}}</td>
+          <td>{{description}}</td>
+          <td>{{evidence_reference}}</td>
+        </tr>
+        {{/timeline}}
+      </tbody>
+    </table>
+  </section>
+
+  <section data-section="entities">
+    <h2>Indicators &amp; entities</h2>
+    <table>
+      <thead>
+        <tr><th>Value</th><th>Type</th><th>Source file</th><th>Confidence</th><th>OSINT summary</th><th>Flags</th></tr>
+      </thead>
+      <tbody>
+        {{#entities}}
+        <tr class="conf-{{confidence}}">
+          <td>{{{value}}}</td>
+          <td>{{type}}</td>
+          <td>{{source_file}}</td>
+          <td><strong>{{confidence}}</strong></td>
+          <td>{{{osint_summary}}}</td>
+          <td>{{#flags}}{{.}} {{/flags}}</td>
+        </tr>
+        {{/entities}}
+      </tbody>
+    </table>
+    {{#hasInvalidEntities}}
+    <h3 class="muted">Invalid / rejected entities</h3>
+    <table>
+      <thead><tr><th>Value</th><th>Type</th><th>Reason</th></tr></thead>
+      <tbody>
+        {{#invalidEntities}}
+        <tr><td>{{{value}}}</td><td>{{type}}</td><td>{{reason}}</td></tr>
+        {{/invalidEntities}}
+      </tbody>
+    </table>
+    {{/hasInvalidEntities}}
+  </section>
+
+  <section data-section="correlation">
+    <h2>Correlation &amp; cluster alerts</h2>
+    {{#hasClusters}}
+    <table>
+      <thead>
+        <tr><th>Type</th><th>Entity / summary</th><th>Linked cases</th><th>Count</th><th>Severity</th></tr>
+      </thead>
+      <tbody>
+        {{#clusters}}
+        <tr>
+          <td>{{type}}</td>
+          <td>{{{entityValue}}}</td>
+          <td>{{#linkedCaseIds}}{{.}} {{/linkedCaseIds}}</td>
+          <td>{{caseCount}}</td>
+          <td><span class="badge {{severityClass}}">{{severity}}</span></td>
+        </tr>
+        {{/clusters}}
+      </tbody>
+    </table>
+    {{/hasClusters}}
+    {{^hasClusters}}
+    <p class="muted">No cluster alerts recorded for this case.</p>
+    {{/hasClusters}}
+  </section>
+
+  <section data-section="modus-operandi">
+    <h2>Modus operandi</h2>
+    <p><strong>Category:</strong> {{scamCategory}}</p>
+    {{#hasModusDetail}}<p>{{{modusOperandiDetail}}}</p>{{/hasModusDetail}}
+  </section>
+
+  <section data-section="graph">
+    <h2>Entity graph</h2>
+    {{#graphImage}}
+    <p class="muted">Subgraph snapshot (PNG)</p>
+    <img src="{{graphImage}}" alt="Graph" style="max-width:100%;height:auto;border:1px solid var(--color-border);" />
+    {{/graphImage}}
+    {{^graphImage}}
+    <p class="muted">No graph image embedded for this export.</p>
+    {{/graphImage}}
+  </section>
+
+  <section data-section="recommendations">
+    <h2>Actionable requests</h2>
+    <table>
+      <thead>
+        <tr><th>Priority</th><th>Action</th><th>Target</th><th>Bank</th><th>Justification</th></tr>
+      </thead>
+      <tbody>
+        {{#recommendations}}
+        <tr>
+          <td>{{priority}}</td>
+          <td>{{action}}</td>
+          <td>{{{targetEntity}}}</td>
+          <td>{{targetBank}}</td>
+          <td>{{{justification}}}</td>
+        </tr>
+        {{/recommendations}}
+      </tbody>
+    </table>
+  </section>
+
+  <section data-section="legal-drafts">
+    <h2>Legal draft fragments</h2>
+    {{#legalDrafts}}
+    <div style="margin-bottom:16px;padding:12px;border:1px solid var(--color-border);">
+      <p class="muted">{{section}} — {{template}}</p>
+      <div>{{{content}}}</div>
+    </div>
+    {{/legalDrafts}}
+  </section>
+
+  <section data-section="analyst-cert">
+    <h2>Analyst certification</h2>
+    <p>I certify that this GRASSReport/1.0 package was generated under controlled HITL review.</p>
+    <table>
+      <tbody>
+        <tr><th>Analyst name</th><td>{{{analystName}}}</td></tr>
+        <tr><th>Badge ID</th><td>{{{analystId}}}</td></tr>
+        <tr><th>Signature hash (SHA-256)</th><td style="font-family:var(--font-mono);font-size:9px;word-break:break-all;">{{analystSigHash}}</td></tr>
+        <tr><th>Timestamp</th><td>{{generatedAt}}</td></tr>
+      </tbody>
+    </table>
+  </section>
+</body>
+</html>

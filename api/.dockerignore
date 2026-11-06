@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+*.log
+npm-debug.log*
+.npm
+coverage
+.nyc_output
+uploads
+grass_investigate.mjs
+scripts
+src/tests

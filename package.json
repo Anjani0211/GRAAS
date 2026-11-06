@@ -1,0 +1,25 @@
+{
+  "name": "graas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GRASS — single-repo dev orchestration",
+  "scripts": {
+    "dev:services": "docker compose up -d",
+    "dev:services:down": "docker compose down",
+    "dev:llm": "docker compose --env-file api/.env -f docker-compose.yml -f docker-compose.llm.yml up -d llama",
+    "dev:llm:down": "docker compose --env-file api/.env -f docker-compose.yml -f docker-compose.llm.yml stop llama",
+    "dev:api": "npm --prefix api run dev",
+    "dev:web": "npm --prefix web run dev",
+    "dev": "npm run dev:services && concurrently --names \"API,WEB\" --prefix-colors \"cyan,magenta\" \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:app": "concurrently --names \"API,WEB\" --prefix-colors \"cyan,magenta\" \"npm run dev:api\" \"npm run dev:web\"",
+    "docker:up": "docker compose --env-file api/.env -f docker-compose.yml -f docker-compose.llm.yml --profile app up -d --build",
+    "docker:down": "docker compose --env-file api/.env -f docker-compose.yml -f docker-compose.llm.yml --profile app down",
+    "docker:full": "docker compose --env-file api/.env -f docker-compose.yml -f docker-compose.llm.yml --profile app --profile full up -d --build",
+    "typecheck": "npm --prefix api run typecheck && npm --prefix web exec -- npx tsc --noEmit",
+    "test": "npm --prefix api test && npm --prefix web test",
+    "verify": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

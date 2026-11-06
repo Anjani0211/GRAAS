@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+api/node_modules/
+web/node_modules/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+api/.env
+api/.env.*
+web/.env
+web/.env.*
+*.pem
+*.key
+
+# Uploads & local runtime data
+api/uploads/
+api/dist/
+web/.next/
+web/out/
+web/build/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+# Logs / OS
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Local LLM weights & large artifacts
+*.gguf
+*.bin
+outputs/
+Sample Report .pdf
+GRASS_Investigation_Report_*.docx
+GRASS_Investigation_Report_*.pdf
+
+# Editor / agent clutter
+.cursor/
+PROGRESS.md.fix
+PROGRESS.md.new
+*.clean
+*.head
+
+# Docker / local volumes (if ever copied in)
+grass_*_data/

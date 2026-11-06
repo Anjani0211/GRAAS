@@ -1,0 +1,32 @@
+import type { AgentTool } from "./toolRegistry";
+import {
+  lookupPhoneTool,
+  lookupUpiTool,
+  lookupIpTool,
+  scanUrlTool,
+  whoisDomainTool,
+  checkEmailBreachTool,
+  traceCryptoWalletTool,
+  searchUsernameTool,
+  analyzeApkTool,
+  lookupTelegramIdTool,
+  captureWebsiteTool,
+  extractExifTool,
+  checkCrossCaseMatchesTool,
+} from "./tools";
+
+export const TOOL_REGISTRY: Array<AgentTool<unknown, unknown>> = [
+  lookupPhoneTool as unknown as AgentTool<unknown, unknown>,
+  lookupUpiTool as unknown as AgentTool<unknown, unknown>,
+  lookupIpTool as unknown as AgentTool<unknown, unknown>,
+  scanUrlTool as unknown as AgentTool<unknown, unknown>,
+  whoisDomainTool as unknown as AgentTool<unknown, unknown>,
+  checkEmailBreachTool as unknown as AgentTool<unknown, unknown>,
+  traceCryptoWalletTool as unknown as AgentTool<unknown, unknown>,
+  searchUsernameTool as unknown as AgentTool<unknown, unknown>,
+  analyzeApkTool as unknown as AgentTool<unknown, unknown>,
+  lookupTelegramIdTool as unknown as AgentTool<unknown, unknown>,
+  captureWebsiteTool as unknown as AgentTool<unknown, unknown>,
+  extractExifTool as unknown as AgentTool<unknown, unknown>,
+  checkCrossCaseMatchesTool as unknown as AgentTool<unknown, unknown>,
+];
