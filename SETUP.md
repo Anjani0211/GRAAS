@@ -6,9 +6,12 @@ Everything you need to go from zero to a running investigation portal.
 
 ## Option A — One-Command Start (Docker, Recommended)
 
-Requires: **Docker Desktop** running.
+Requires: **Docker** running + **Node.js 22+** on the host (for `make seed`).
 
 ```bash
+# 0. Use Node 22 (repo includes .nvmrc)
+nvm use
+
 # 1. Clone and enter the repo
 cd "autobot projects/GRAAS"
 
@@ -21,10 +24,15 @@ make seed
 # 4. Open the portal
 open http://localhost:3000/login
 # Email:    admin@grass.local
-# Password: GrassAdmin@2026
+# Password: GrassAdmin2026Secure
 ```
 
-That's it. GRASS is running.
+> Locked out or changed the password and forgot it? Run `make reset-admin` — it
+> resets the admin password, re-activates the account, and clears any
+> brute-force lockout. Override the defaults with
+> `make seed SEED_ADMIN_PASSWORD='YourStrongPass!'`.
+
+That's it. GRAAS is running.
 
 ---
 
@@ -35,6 +43,8 @@ Use this when actively developing the code.
 ```bash
 # Step 1 — Start infrastructure (MongoDB, Redis, MinIO, Neo4j)
 make dev-services
+# If another MongoDB already owns :27017 it is reused automatically.
+# To force the bundled Mongo on another port: MONGO_HOST_PORT=27018 make dev-services
 
 # Step 2 — Start API (in a new terminal)
 make dev-api
@@ -66,13 +76,21 @@ After running `make seed`:
 
 - **URL**: http://localhost:3000/login
 - **Email**: admin@grass.local
-- **Password**: GrassAdmin@2026
+- **Password**: GrassAdmin2026Secure
 - **Role**: Admin (full access, HITL badge, LE submission)
 
 To create a custom admin:
 ```bash
 cd api && npm run seed:admin -- --email you@org.com --password "Str0ngPass!" --badge "BADGE-001" --name "Your Name"
 ```
+
+Locked out or forgot the password? `make reset-admin` resets it and clears any
+brute-force lockout. In local dev you can also copy `web/.env.example` to
+`web/.env.local` to display the seeded credentials on the login page.
+
+The dev server also works when opened via `http://127.0.0.1:3000` or a LAN IP —
+the API base follows the browser hostname and dev CORS allows loopback/LAN
+origins automatically.
 
 ---
 
@@ -147,15 +165,20 @@ but fuller key coverage = higher confidence scores.
 ## Makefile Quick Reference
 
 ```bash
-make up              # Start full stack
+make up              # Start full stack (infra + API + Web)
+make up-full         # Full stack + local LLM + Playwright sidecar
 make down            # Stop everything
 make reset           # Stop + wipe all data (fresh start)
 make seed            # Create first admin user
+make dev             # Infra + API + Web with hot-reload (no app containers)
 make logs            # Tail all logs
 make logs-api        # Tail API logs only
+make logs-web        # Tail Web logs only
 make restart-api     # Restart API after changes
+make restart-web     # Restart Web after changes
 make typecheck       # Run TypeScript checks
 make test            # Run all tests
+make verify          # Typecheck + tests
 make help            # Show all commands
 ```
 
@@ -180,6 +203,8 @@ GET  /admin/queues                            Bull Board queue UI (admin JWT)
 
 ## Known Gaps (Non-blocking)
 
+- **Node 20 is unsupported** — Next.js 16 and cloud LLM calls need Node 22+ (`.nvmrc` included).
+- **MinIO image** — upstream `minio/minio` was removed from Docker Hub/Quay; compose uses the `bitnamilegacy/minio` mirror. Without MinIO the API falls back to local disk (`api/uploads/`).
 - Email notification on victim erasure requests (DPDP §11(3)) — needs SendGrid/SES key
 - Minor data special handling (DPDP §9)
 - Shodan provider — requires paid API key

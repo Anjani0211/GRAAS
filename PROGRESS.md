@@ -238,7 +238,8 @@ Multi-stage Next.js image:
 Idempotent first-admin seeder — solves chicken-and-egg problem (`POST /auth/register` requires an existing `ADMIN` JWT, but no admin exists at first boot).
 - Connects directly to MongoDB via Mongoose, bypassing the HTTP layer.
 - CLI flags: `--email`, `--password`, `--badge`, `--name` (all optional with secure defaults).
-- Defaults: `admin@grass.local` / `GrassAdmin@2026` / `BADGE-ADMIN-001`.
+- Defaults: `admin@grass.local` / `GrassAdmin2026Secure` / `BADGE-ADMIN-001`.
+- `--force` resets an existing admin's password and clears any lockout (`make reset-admin`).
 - Idempotent: skips silently if email already exists.
 - Invoked via: `npm run seed:admin` (added to `api/package.json` scripts).
 

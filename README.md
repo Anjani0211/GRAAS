@@ -6,7 +6,7 @@ A full-stack cybercrime assistance platform built with Next.js and Express.
 
 **Frontend:** Next.js 16 (App Router), TypeScript, Tailwind CSS v4, shadcn/ui, Framer Motion, Recharts, Zustand
 
-**Backend:** Node.js, Express, TypeScript, MongoDB + Mongoose, Zod validation
+**Backend:** Node.js 22+, Express, TypeScript, MongoDB + Mongoose, Zod validation
 
 ## Project Structure
 
@@ -33,6 +33,10 @@ graas/
 
 ## Getting Started
 
+> **Node.js 22+ is required.** Next.js 16 and the bundled undici client fail on
+> Node 20 (`webidl.util.markAsUncloneable is not a function`). A `.nvmrc` is
+> included — run `nvm use` before starting the apps.
+
 ### Frontend
 
 ```bash
@@ -56,7 +60,7 @@ API docs: [http://localhost:8000/api/health](http://localhost:8000/api/health).
 
 ### Prerequisites
 
-- **Node.js** 18+
+- **Node.js** 22+ (Node 22 LTS recommended)
 - **MongoDB** running locally or a MongoDB Atlas connection string
 
 Set your MongoDB URI in `api/.env`:
@@ -108,7 +112,7 @@ MONGODB_URI=mongodb://localhost:27017/graas
 ### Frontend (`web/.env.local`)
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8000/api
 ```
 
 ### Backend (`api/.env`)

@@ -3,6 +3,45 @@ dotenv.config();
 
 const port = parseInt(process.env.PORT || "8000", 10);
 
+/**
+ * CORS_ORIGIN accepts a comma-separated allowlist. Defaults cover the two
+ * common local URLs; add e.g. http://192.168.1.10:3000 for LAN access.
+ */
+const corsOrigins = (process.env.CORS_ORIGIN || "http://localhost:3000,http://127.0.0.1:3000")
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter(Boolean);
+
+/** Loopback + RFC1918 hostnames, used only to make local/LAN dev painless. */
+function isPrivateNetworkHost(hostname: string): boolean {
+  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]") {
+    return true;
+  }
+  const match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!match) return false;
+  const [a, b] = [Number(match[1]), Number(match[2])];
+  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+}
+
+/**
+ * True when an Origin is safe to accept. In development we also allow
+ * loopback/LAN origins so opening the web app via 127.0.0.1 or a LAN IP works
+ * without editing CORS_ORIGIN. Production always uses the explicit allowlist.
+ */
+export function isOriginAllowed(origin?: string | null): boolean {
+  if (!origin) return true; // non-browser clients (curl, server-to-server)
+  const normalized = origin.replace(/\/$/, "");
+  if (corsOrigins.includes(normalized)) return true;
+  if ((process.env.NODE_ENV || "development") !== "production") {
+    try {
+      return isPrivateNetworkHost(new URL(normalized).hostname);
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
 export const config = {
   port,
   publicBaseUrl: (process.env.PUBLIC_BASE_URL || `http://localhost:${port}`).replace(/\/$/, ""),
@@ -12,7 +51,10 @@ export const config = {
     (process.env.NODE_ENV === "production" ? "" : "dev-secret-key-change-in-production"),
   jwtExpiry: process.env.JWT_EXPIRY || "8h",
   nodeEnv: process.env.NODE_ENV || "development",
-  corsOrigin: process.env.CORS_ORIGIN || "http://localhost:3000",
+  /** First allowed origin — kept for callers that expect a single value. */
+  corsOrigin: corsOrigins[0] || "",
+  /** Full allowlist parsed from CORS_ORIGIN. */
+  corsOrigins,
 
   // OSINT — Phase 1 (live)
   whoisxmlApiKey: process.env.WHOISXML_API_KEY || "",

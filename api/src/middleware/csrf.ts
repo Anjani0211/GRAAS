@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { config } from "../config";
+import { config, isOriginAllowed } from "../config";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -28,17 +28,22 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
     return;
   }
 
-  const allowed = config.corsOrigin.replace(/\/$/, "");
   const origin = String(req.headers.origin ?? "").replace(/\/$/, "");
-  if (origin && origin === allowed) {
+  if (origin && isOriginAllowed(origin)) {
     next();
     return;
   }
 
   const referer = String(req.headers.referer ?? "");
-  if (referer.startsWith(allowed + "/") || referer === allowed) {
-    next();
-    return;
+  if (referer) {
+    try {
+      if (isOriginAllowed(new URL(referer).origin)) {
+        next();
+        return;
+      }
+    } catch {
+      /* malformed Referer — fall through to the CSRF rejection below */
+    }
   }
 
   // Dev convenience: same-host without Origin (curl / health tools with cookie)

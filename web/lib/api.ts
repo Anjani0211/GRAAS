@@ -18,7 +18,25 @@ import type {
 } from "./types";
 import type { CaseStatus } from "./utils";
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+/**
+ * Resolve the API base URL.
+ *
+ * `NEXT_PUBLIC_API_URL` wins when explicitly configured. Otherwise the browser
+ * uses the same hostname the app was opened on. Using `localhost` unconditionally
+ * breaks 127.0.0.1 / LAN access: the auth cookie is host-scoped, so a cookie set
+ * for `localhost` is never sent to `127.0.0.1:3000` and the proxy bounces the
+ * user back to /login.
+ */
+function resolveApiBase(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:8000/api`;
+  }
+  return "http://localhost:8000/api";
+}
+
+export const API_BASE = resolveApiBase();
 
 export class ApiError extends Error {
   constructor(

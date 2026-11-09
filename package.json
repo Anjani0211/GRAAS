@@ -3,9 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "description": "GRASS — single-repo dev orchestration",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
-    "dev:services": "docker compose up -d",
-    "dev:services:down": "docker compose down",
+    "predev": "node scripts/check-node.mjs",
+    "dev:services": "bash scripts/dev-services.sh",
+    "dev:services:down": "docker compose stop mongo redis minio neo4j",
     "dev:llm": "docker compose --env-file api/.env -f docker-compose.yml -f docker-compose.llm.yml up -d llama",
     "dev:llm:down": "docker compose --env-file api/.env -f docker-compose.yml -f docker-compose.llm.yml stop llama",
     "dev:api": "npm --prefix api run dev",
@@ -15,7 +19,7 @@
     "docker:up": "docker compose --env-file api/.env -f docker-compose.yml -f docker-compose.llm.yml --profile app up -d --build",
     "docker:down": "docker compose --env-file api/.env -f docker-compose.yml -f docker-compose.llm.yml --profile app down",
     "docker:full": "docker compose --env-file api/.env -f docker-compose.yml -f docker-compose.llm.yml --profile app --profile full up -d --build",
-    "typecheck": "npm --prefix api run typecheck && npm --prefix web exec -- npx tsc --noEmit",
+    "typecheck": "npm --prefix api run typecheck && npm --prefix web run typecheck",
     "test": "npm --prefix api test && npm --prefix web test",
     "verify": "npm run typecheck && npm test"
   },

@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
-import { config } from "./config";
+import { config, isOriginAllowed } from "./config";
 import { validateSecurityConfig } from "./config/securityValidation";
 import { connectDatabase } from "./config/database";
 import { graphDB } from "./services/graphDB";
@@ -24,7 +24,16 @@ import { csrfProtection } from "./middleware/csrf";
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: config.corsOrigin, credentials: true }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Non-browser clients (curl, server-to-server) send no Origin header.
+      if (!origin) return callback(null, true);
+      return callback(null, isOriginAllowed(origin));
+    },
+    credentials: true,
+  }),
+);
 app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));

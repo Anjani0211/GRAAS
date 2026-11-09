@@ -17,7 +17,8 @@ services:
     image: mongo:7
     container_name: grass-mongo
     ports:
-      - "27017:27017"
+      # Override with MONGO_HOST_PORT if 27017 is already in use on the host.
+      - "${MONGO_HOST_PORT:-27017}:27017"
     volumes:
       - grass_mongo_data:/data/db
     restart: unless-stopped
@@ -42,17 +43,22 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio:latest
+    # Upstream minio/minio was removed from Docker Hub/Quay. Bitnami's legacy
+    # mirror ships the same MinIO server; MINIO_BROWSER=on enables the console.
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
     container_name: grass-minio
-    command: server /data --console-address ":9001"
     ports:
       - "9000:9000"
       - "9001:9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-grassadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-grasssecret123}
+      MINIO_BROWSER: "on"
+      MINIO_DATA_DIR: /bitnami/minio/data
+      MINIO_API_PORT_NUMBER: "9000"
+      MINIO_CONSOLE_PORT_NUMBER: "9001"
     volumes:
-      - grass_minio_data:/data
+      - grass_minio_data:/bitnami/minio/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]

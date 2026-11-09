@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
  * Soft gate: redirects unauthenticated browser sessions away from protected
  * layouts. Full RBAC still enforced by AuthGuard + API JWT/cookie checks.
  */
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const token = req.cookies.get("graas_token")?.value;
 

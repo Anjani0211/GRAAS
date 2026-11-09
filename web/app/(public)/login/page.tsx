@@ -18,6 +18,15 @@ import { isStaffRole } from "@/lib/roles";
 type Mode = "login" | "register";
 type Role = "victim" | "staff";
 
+/**
+ * Optional dev convenience: when these are set in web/.env.local, the login
+ * page shows the seeded admin credentials. Never rendered in production.
+ */
+const DEMO_ADMIN_EMAIL = process.env.NEXT_PUBLIC_DEMO_ADMIN_EMAIL ?? "";
+const DEMO_ADMIN_PASSWORD = process.env.NEXT_PUBLIC_DEMO_ADMIN_PASSWORD ?? "";
+const SHOW_DEMO_CREDENTIALS =
+  process.env.NODE_ENV !== "production" && Boolean(DEMO_ADMIN_EMAIL && DEMO_ADMIN_PASSWORD);
+
 /** Open redirect-safe: only same-app relative paths, role-appropriate prefix. */
 function postAuthDestination(user: User): string {
   if (typeof window === "undefined") {
@@ -40,6 +49,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,11 +59,16 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setNotice("");
     setIsSubmitting(true);
+
+    // Users often paste an email with a trailing space; the API trims it too,
+    // but doing it here keeps the UI and the request consistent.
+    const cleanEmail = email.trim();
 
     try {
       if (mode === "login") {
-        await login(email, password);
+        await login(cleanEmail, password);
       } else {
         // Public self-register is always victim (API enforces this too).
         if (role === "staff") {
@@ -61,7 +76,7 @@ export default function LoginPage() {
           setIsSubmitting(false);
           return;
         }
-        await register({ name, email, password, phone: phone || undefined, role: "victim" });
+        await register({ name, email: cleanEmail, password, phone: phone || undefined, role: "victim" });
       }
 
       const user = useAuthStore.getState().user;
@@ -135,10 +150,17 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form className="space-y-4" onSubmit={handleSubmit}>
+            {/* method="post" prevents credentials leaking into the URL if JS fails to hydrate. */}
+            <form className="space-y-4" method="post" onSubmit={handleSubmit}>
               {error && (
                 <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
                   {error}
+                </div>
+              )}
+
+              {notice && (
+                <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800">
+                  {notice}
                 </div>
               )}
 
@@ -152,7 +174,9 @@ export default function LoginPage() {
                       <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                       <Input
                         id="name"
+                        name="name"
                         type="text"
+                        autoComplete="name"
                         placeholder="John Doe"
                         className="pl-9"
                         value={name}
@@ -170,7 +194,9 @@ export default function LoginPage() {
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                       <Input
                         id="phone"
+                        name="phone"
                         type="tel"
+                        autoComplete="tel"
                         placeholder="+91 98765 43210"
                         className="pl-9"
                         value={phone}
@@ -189,7 +215,9 @@ export default function LoginPage() {
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                   <Input
                     id="email"
+                    name="email"
                     type="email"
+                    autoComplete="email"
                     placeholder="you@example.com"
                     className="pl-9"
                     value={email}
@@ -205,16 +233,26 @@ export default function LoginPage() {
                     Password
                   </Label>
                   {mode === "login" && (
-                    <Link href="#" className="text-xs text-primary hover:underline">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setNotice(
+                          "Password resets are handled by an administrator. On the server, run: make reset-admin",
+                        )
+                      }
+                      className="text-xs text-primary hover:underline cursor-pointer"
+                    >
                       Forgot password?
-                    </Link>
+                    </button>
                   )}
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                   <Input
                     id="password"
+                    name="password"
                     type={showPassword ? "text" : "password"}
+                    autoComplete={mode === "login" ? "current-password" : "new-password"}
                     placeholder="••••••••"
                     className="pl-9 pr-9"
                     value={password}
@@ -277,6 +315,13 @@ export default function LoginPage() {
                 <Link href="/submit" className="text-primary hover:underline font-medium">
                   Submit here
                 </Link>
+              </p>
+            )}
+
+            {mode === "login" && SHOW_DEMO_CREDENTIALS && (
+              <p className="mt-4 text-center text-xs text-muted-foreground">
+                Dev seed: <span className="font-mono">{DEMO_ADMIN_EMAIL}</span> /{" "}
+                <span className="font-mono">{DEMO_ADMIN_PASSWORD}</span>
               </p>
             )}
           </CardContent>

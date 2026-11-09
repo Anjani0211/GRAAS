@@ -28,7 +28,7 @@ export function validateSecurityConfig(): void {
     if (!config.ssrfProtectionEnabled) {
       throw new Error("SSRF_PROTECTION must remain enabled in production");
     }
-    if (config.corsOrigin === "*") {
+    if (config.corsOrigins.includes("*")) {
       throw new Error("CORS_ORIGIN must not be '*' in production");
     }
     if (!config.neo4jPassword || WEAK_PASSWORDS.has(config.neo4jPassword)) {

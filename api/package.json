@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "description": "GRAAS API — Node.js + Express + MongoDB backend",
   "main": "dist/app.js",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
+    "predev": "node ../scripts/check-node.mjs",
+    "prestart": "node ../scripts/check-node.mjs",
     "dev": "tsx watch src/app.ts",
     "build": "tsc && node -e \"const fs=require('fs'),p=require('path');const s=p.join('src','templates'),d=p.join('dist','templates');if(fs.existsSync(s))fs.cpSync(s,d,{recursive:true});\"",
     "start": "node dist/app.js",
