@@ -14,7 +14,7 @@ import { getOpenAIClient, getLlmModel } from "../services/llmClient";
 const router = Router();
 
 const AiBodySchema = z.object({
-  provider: z.enum(["env", "openrouter", "openai", "nvidia", "custom", "local"]),
+  provider: z.enum(["env", "openrouter", "openai", "nvidia", "custom"]),
   apiKey: z.string().optional(),
   clearApiKey: z.boolean().optional(),
   baseUrl: z.string().optional(),

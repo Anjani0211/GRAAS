@@ -53,7 +53,7 @@ export async function extractTextFromImageBuffer(
     const strippedBuffer = stripExif(imageBuffer);
     const text = await ocrImageWithGemini(strippedBuffer, mt);
     if (!text) {
-      return { ok: false, reason: "Local LLM OCR returned empty text (check llama-server and LOCAL_LLM_VISION_ENABLED)" };
+      return { ok: false, reason: "LLM OCR returned empty text (check vision-capable model and LLM_VISION_ENABLED)" };
     }
     logger.info({ file: fileName, chars: text.length }, "[OCR] Text extracted from image");
     return { ok: true, text };

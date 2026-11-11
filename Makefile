@@ -8,6 +8,7 @@
 	restart-api restart-web dev dev-services dev-services-down dev-api dev-web \
 	typecheck test verify help
 
+
 # Override on the command line, e.g. make seed SEED_ADMIN_PASSWORD='MyPass123!'
 # The default avoids trailing punctuation so it is easy to type correctly.
 SEED_ADMIN_EMAIL    ?= admin@grass.local
@@ -30,20 +31,17 @@ up:
 	@echo ""
 	@echo "   First run? → make seed"
 
-# Start with local LLM (llama.cpp) + Playwright sidecar (TGStat enrichment)
+# Start with Playwright sidecar (TGStat enrichment)
 up-full:
-	docker compose --env-file api/.env -f docker-compose.yml -f docker-compose.llm.yml \
-		--profile app --profile full up -d --build
+	docker compose --env-file api/.env --profile app --profile full up -d --build
 
 # Stop all services
 down:
-	docker compose --env-file api/.env -f docker-compose.yml -f docker-compose.llm.yml \
-		--profile app --profile full down
+	docker compose --env-file api/.env --profile app --profile full down
 
 # Stop + remove volumes (full reset)
 reset:
-	docker compose --env-file api/.env -f docker-compose.yml -f docker-compose.llm.yml \
-		--profile app --profile full down -v
+	docker compose --env-file api/.env --profile app --profile full down -v
 	@echo "🗑️  All data volumes removed. Run 'make up && make seed' to start fresh."
 
 # Tail logs (all services)
@@ -149,7 +147,7 @@ help:
 	@echo "  GRASS Makefile commands"
 	@echo "  ───────────────────────────────────────────────"
 	@echo "  make up              Start full stack (docker)"
-	@echo "  make up-full         Start with local LLM + Playwright sidecar"
+	@echo "  make up-full         Start with Playwright sidecar"
 	@echo "  make down            Stop all containers"
 	@echo "  make reset           Stop + wipe all data volumes"
 	@echo "  make seed            Create first admin user"

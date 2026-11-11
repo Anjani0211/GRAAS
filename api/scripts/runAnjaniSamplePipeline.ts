@@ -196,27 +196,26 @@ async function upsertCase(victimUserId: string): Promise<ICase> {
 }
 
 async function checkLlm(): Promise<void> {
-  const base = process.env.LOCAL_LLM_BASE_URL || "http://127.0.0.1:8080/v1";
-  const model = process.env.LOCAL_LLM_MODEL || "(default)";
-  const root = base.replace(/\/v1\/?$/, "");
-  const healthUrl = root.includes(":11434") ? `${root}/api/tags` : `${root}/health`;
-  try {
-    const res = await fetch(healthUrl, { signal: AbortSignal.timeout(15000) });
-    if (!res.ok) {
-      console.warn(`⚠ LLM ${healthUrl} → HTTP ${res.status}`);
-    } else {
-      console.log(`✓ Local LLM healthy (${model}) at ${base}`);
-    }
-  } catch (e) {
-    console.warn(`⚠ LLM not reachable: ${e instanceof Error ? e.message : e}`);
-    console.warn("  Start Ollama or: npm run llm:server");
+  const key =
+    process.env.LLM_API_KEY ||
+    process.env.OPENROUTER_API_KEY ||
+    process.env.OPENAI_API_KEY ||
+    process.env.NVIDIA_API_KEY ||
+    "";
+  const model = process.env.LLM_MODEL || "(default)";
+  const base = process.env.LLM_BASE_URL || "";
+  if (!key) {
+    console.warn("⚠ No cloud LLM API key set (OPENROUTER_API_KEY / OPENAI_API_KEY / LLM_API_KEY)");
+    console.warn("  Configure Admin → Settings or api/.env");
+    return;
   }
+  console.log(`✓ Cloud LLM key present · model ${model}${base ? ` · ${base}` : ""}`);
 }
 
 async function main(): Promise<void> {
   console.log("\n═══ GRASS — Anjani Sample Report Pipeline ═══\n");
   console.log(`PDF: ${pdfArg}`);
-  console.log(`Model: ${process.env.LOCAL_LLM_MODEL || "gemma2b"} @ ${process.env.LOCAL_LLM_BASE_URL || "http://127.0.0.1:8080/v1"}\n`);
+  console.log(`Model: ${process.env.LLM_MODEL || "(from env/settings)"} @ ${process.env.LLM_BASE_URL || "(provider default)"}\n`);
 
   await checkLlm();
   await connectDatabase();

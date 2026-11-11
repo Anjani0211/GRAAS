@@ -3,9 +3,6 @@ import { ChatOpenAI } from "@langchain/openai";
 import { logger } from "../utils/logger";
 import { getEffectiveLlm } from "./runtimeSettings";
 
-/** llama.cpp / Ollama ignore the key; placeholder only. */
-const LOCAL_LLM_DUMMY_KEY = "local";
-
 let loggedFingerprint = "";
 
 function logProviderOnce(): void {
@@ -15,8 +12,7 @@ function logProviderOnce(): void {
   loggedFingerprint = fingerprint;
   logger.info(
     {
-      provider: llm.isCloud ? "cloud" : "local",
-      settingsProvider: llm.provider,
+      provider: llm.provider,
       baseUrl: llm.baseUrl,
       model: llm.model,
       vision: llm.visionEnabled,
@@ -27,29 +23,19 @@ function logProviderOnce(): void {
   );
 }
 
-/** True when cloud API key is set, or a local OpenAI-compatible base URL is configured. */
+/** True when a cloud / OpenAI-compatible API key and base URL are configured. */
 export function isLlmConfigured(): boolean {
   const llm = getEffectiveLlm();
-  return Boolean(llm.apiKey) || Boolean(llm.baseUrl);
-}
-
-/** @deprecated use isLlmConfigured */
-export function isLocalLlmConfigured(): boolean {
-  return isLlmConfigured();
+  return Boolean(llm.apiKey) && Boolean(llm.baseUrl);
 }
 
 export function getLlmModel(): string {
   return getEffectiveLlm().model;
 }
 
-/** @deprecated use getLlmModel */
-export function getLocalLlmModel(): string {
-  return getLlmModel();
-}
-
 function defaultHeaders(): Record<string, string> | undefined {
   const llm = getEffectiveLlm();
-  if (!llm.isCloud) return undefined;
+  if (!llm.apiKey) return undefined;
   if (llm.baseUrl.includes("openrouter.ai")) {
     return {
       "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER || "https://graas.local",
@@ -62,10 +48,12 @@ function defaultHeaders(): Record<string, string> | undefined {
 export function getOpenAIClient(): OpenAI {
   logProviderOnce();
   const llm = getEffectiveLlm();
-  const apiKey = llm.isCloud || llm.apiKey ? llm.apiKey || LOCAL_LLM_DUMMY_KEY : LOCAL_LLM_DUMMY_KEY;
+  if (!llm.apiKey || !llm.baseUrl) {
+    throw new Error("LLM is not configured — set a cloud API key in Settings or api/.env");
+  }
   const headers = defaultHeaders();
   return new OpenAI({
-    apiKey,
+    apiKey: llm.apiKey,
     baseURL: llm.baseUrl,
     ...(headers ? { defaultHeaders: headers } : {}),
   });
@@ -74,12 +62,14 @@ export function getOpenAIClient(): OpenAI {
 export function createChatModel(options?: { temperature?: number; timeout?: number }): ChatOpenAI {
   logProviderOnce();
   const llm = getEffectiveLlm();
-  const apiKey = llm.isCloud || llm.apiKey ? llm.apiKey || LOCAL_LLM_DUMMY_KEY : LOCAL_LLM_DUMMY_KEY;
+  if (!llm.apiKey || !llm.baseUrl) {
+    throw new Error("LLM is not configured — set a cloud API key in Settings or api/.env");
+  }
   const headers = defaultHeaders();
   return new ChatOpenAI({
     model: llm.model,
     temperature: options?.temperature ?? 0,
-    apiKey,
+    apiKey: llm.apiKey,
     configuration: {
       baseURL: llm.baseUrl,
       ...(headers ? { defaultHeaders: headers } : {}),

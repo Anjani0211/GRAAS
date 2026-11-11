@@ -16,7 +16,6 @@
     "test": "tsx --test src/tests/**/*.test.ts",
     "migrate:evidence": "tsx scripts/migrateEvidenceToMinio.ts",
     "seed:admin": "tsx scripts/seedAdmin.ts",
-    "llm:server": "powershell -ExecutionPolicy Bypass -File scripts/start-local-llm.ps1",
     "e2e:report": "tsx scripts/e2ePipelineReport.ts",
     "pipeline:anjani-sample": "tsx scripts/runAnjaniSamplePipeline.ts",
     "export:report": "tsx scripts/exportReportDocxPdf.ts"

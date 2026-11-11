@@ -158,7 +158,7 @@ but fuller key coverage = higher confidence scores.
 | `RAZORPAY_KEY_ID/SECRET` | https://dashboard.razorpay.com/signup  | Free dev    |
 | `WHOISXML_API_KEY`    | Already set ✅                            | —           |
 | `VIRUSTOTAL_API_KEY`  | Already set ✅                            | —           |
-| `LOCAL_LLM_MODEL_PATH`| Host path to Gemma GGUF (see `api/.env`)  | Local       |
+| `OPENROUTER_API_KEY` / `OPENAI_API_KEY` / `LLM_API_KEY` | Cloud LLM (or Admin → Settings) | Paid/free tiers |
 
 ---
 
@@ -166,7 +166,7 @@ but fuller key coverage = higher confidence scores.
 
 ```bash
 make up              # Start full stack (infra + API + Web)
-make up-full         # Full stack + local LLM + Playwright sidecar
+make up-full         # Full stack + Playwright sidecar
 make down            # Stop everything
 make reset           # Stop + wipe all data (fresh start)
 make seed            # Create first admin user
@@ -209,6 +209,7 @@ GET  /admin/queues                            Bull Board queue UI (admin JWT)
 - Minor data special handling (DPDP §9)
 - Shodan provider — requires paid API key
 - Playwright/TGStat worker — start with `make up-full` for Telegram enrichment
+- Cloud LLM key required for AI stages (Admin → Settings or `api/.env`)
 
 ---
 

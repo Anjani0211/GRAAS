@@ -107,18 +107,19 @@ async function upsertTestCase(): Promise<ICase> {
 }
 
 async function checkLlm(): Promise<void> {
-  const base = process.env.LOCAL_LLM_BASE_URL || "http://127.0.0.1:8080/v1";
-  const healthUrl = base.replace(/\/v1\/?$/, "") + "/health";
-  try {
-    const res = await fetch(healthUrl, { signal: AbortSignal.timeout(5000) });
-    if (!res.ok) {
-      console.warn(`⚠ LLM health ${healthUrl} → ${res.status} (pipeline may use fallbacks until model loads)`);
-    } else {
-      console.log(`✓ LLM healthy at ${healthUrl}`);
-    }
-  } catch (e) {
-    console.warn(`⚠ LLM not reachable (${healthUrl}): ${e instanceof Error ? e.message : e}`);
+  const key =
+    process.env.LLM_API_KEY ||
+    process.env.OPENROUTER_API_KEY ||
+    process.env.OPENAI_API_KEY ||
+    process.env.NVIDIA_API_KEY ||
+    "";
+  const model = process.env.LLM_MODEL || "(default)";
+  const base = process.env.LLM_BASE_URL || "";
+  if (!key) {
+    console.warn("⚠ No cloud LLM API key set (OPENROUTER_API_KEY / OPENAI_API_KEY / LLM_API_KEY)");
+    return;
   }
+  console.log(`✓ Cloud LLM key present · model ${model}${base ? ` · ${base}` : ""}`);
 }
 
 async function main(): Promise<void> {

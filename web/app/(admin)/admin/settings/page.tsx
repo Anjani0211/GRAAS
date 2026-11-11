@@ -138,7 +138,7 @@ export default function SettingsPage() {
     try {
       const res = await adminApi.updateAiSettings({
         provider,
-        baseUrl: provider === "custom" || provider === "local" ? baseUrl : baseUrl || undefined,
+        baseUrl: provider === "custom" ? baseUrl : baseUrl || undefined,
         model,
         visionEnabled,
         toolsEnabled,
@@ -277,7 +277,7 @@ export default function SettingsPage() {
               <div>
                 <CardTitle>AI / LLM</CardTitle>
                 <CardDescription>
-                  Any OpenAI-compatible key + any model id (OpenRouter, OpenAI, NVIDIA, custom, local)
+                  Any OpenAI-compatible key + any model id (OpenRouter, OpenAI, NVIDIA, custom)
                 </CardDescription>
               </div>
             </div>
@@ -291,7 +291,7 @@ export default function SettingsPage() {
               <>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <Badge variant="secondary">{ai.fromSettings ? "Settings override" : "From .env"}</Badge>
-                  <Badge variant="secondary">{ai.isCloud ? "Cloud" : "Local"}</Badge>
+                  <Badge variant="secondary">{ai.hasApiKey ? "Configured" : "Not configured"}</Badge>
                   {ai.hasApiKey && (
                     <span className="font-mono">key {ai.apiKeyMasked || "••••"}</span>
                   )}
@@ -308,7 +308,7 @@ export default function SettingsPage() {
                     />
                   </div>
 
-                  {(provider === "custom" || provider === "local" || provider !== "env") && (
+                  {(provider === "custom" || provider !== "env") && (
                     <div className="space-y-2 sm:col-span-2">
                       <Label htmlFor="ai-base">Base URL</Label>
                       <Input
@@ -334,7 +334,7 @@ export default function SettingsPage() {
                       }
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
-                      disabled={provider === "env" || provider === "local"}
+                      disabled={provider === "env"}
                     />
                   </div>
 

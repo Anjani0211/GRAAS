@@ -2,11 +2,10 @@
 #
 # Infra only (API/Web on host via hot-reload):
 #   npm run dev:services
-#   npm run dev:llm          # optional: add grass-llama
 #   npm run dev
 #
-# Full stack in Docker (infra + API + web + local LLM):
-#   npm run docker:up        # uses docker-compose.llm.yml overlay
+# Full stack in Docker (infra + API + web):
+#   npm run docker:up
 #
 # Optional Playwright worker:
 #   npm run docker:full
@@ -102,7 +101,6 @@ services:
       MINIO_ENDPOINT: minio
       NEO4J_URI: bolt://neo4j:7687
       PLAYWRIGHT_WORKER_URL: http://playwright:8001
-      LOCAL_LLM_BASE_URL: http://llama:8080/v1
     depends_on:
       mongo:
         condition: service_healthy

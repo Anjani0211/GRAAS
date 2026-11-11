@@ -53,7 +53,7 @@ app.get("/api/health", (_req, res) => {
       configured: Boolean(llm.apiKey) || Boolean(llm.baseUrl),
       cloud: llm.isCloud,
       model: llm.model,
-      baseUrl: llm.isCloud ? llm.baseUrl : "local",
+      baseUrl: llm.baseUrl || null,
       vision: llm.visionEnabled,
       tools: llm.toolsEnabled,
       provider: llm.provider,
@@ -93,8 +93,8 @@ async function start(): Promise<void> {
     const llm = getEffectiveLlm();
     logger.info(
       {
-        llm: isLlmConfigured() ? (llm.isCloud ? "cloud" : "local") : "none",
-        model: getLlmModel(),
+        llm: isLlmConfigured() ? "cloud" : "none",
+        model: getLlmModel() || null,
         provider: llm.provider,
         fromSettings: llm.fromSettings,
       },

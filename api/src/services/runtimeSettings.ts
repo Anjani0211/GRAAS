@@ -105,9 +105,21 @@ export async function refreshRuntimeSettings(): Promise<void> {
     return;
   }
   const { plain, labels } = keysFromDoc(doc as IPlatformSettings);
+  // Legacy "local" (llama.cpp) provider → fall back to env.
+  const rawProvider = String(doc.ai?.provider || "env");
+  const provider: AiProviderId =
+    rawProvider === "local" || !(["env", "openrouter", "openai", "nvidia", "custom"] as string[]).includes(rawProvider)
+      ? "env"
+      : (rawProvider as AiProviderId);
+  if (rawProvider === "local") {
+    await PlatformSettings.updateOne(
+      { key: SETTINGS_DOC_ID },
+      { $set: { "ai.provider": "env" } },
+    ).catch(() => undefined);
+  }
   cache = {
     ai: {
-      provider: (doc.ai?.provider as AiProviderId) || "env",
+      provider,
       apiKeyEnc: doc.ai?.apiKeyEnc || "",
       baseUrl: doc.ai?.baseUrl || "",
       model: doc.ai?.model || "",
@@ -150,8 +162,8 @@ export function getEffectiveLlm(): EffectiveLlm {
       baseUrl: config.llmBaseUrl,
       model: config.llmModel,
       isCloud: config.llmIsCloud,
-      visionEnabled: config.localLlmVisionEnabled,
-      toolsEnabled: config.localLlmToolsEnabled,
+      visionEnabled: config.llmVisionEnabled,
+      toolsEnabled: config.llmToolsEnabled,
       fromSettings: false,
       hasApiKey: Boolean(config.llmApiKey),
       apiKeyMasked: maskSecret(config.llmApiKey),
@@ -161,12 +173,11 @@ export function getEffectiveLlm(): EffectiveLlm {
   const sealed = ai.apiKeyEnc || "";
   const apiKey = sealed ? openSecret(sealed) || "" : "";
   const baseUrl = resolveProviderBaseUrl(ai.provider, ai.baseUrl);
-  const isLocal = ai.provider === "local" || (!apiKey && Boolean(baseUrl));
-  const isCloud = Boolean(apiKey) && !isLocal;
+  const isCloud = Boolean(apiKey);
   const model =
     (ai.model || "").trim() ||
     config.llmModel ||
-    (isCloud ? "gpt-4o-mini" : "local-model");
+    (isCloud ? "gpt-4o-mini" : "");
 
   const visionEnabled =
     ai.visionEnabled !== null && ai.visionEnabled !== undefined

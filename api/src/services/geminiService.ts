@@ -90,7 +90,7 @@ export interface GeminiServiceFallback {
 export type GeminiResult = GeminiServiceResult | GeminiServiceFallback;
 
 /**
- * Extract entities from evidence using cloud LLM (OpenRouter/OpenAI/NVIDIA) or local llama.cpp.
+ * Extract entities from evidence using cloud LLM (OpenRouter/OpenAI/NVIDIA/custom).
  *
  * Retry behaviour:
  * - On first failure: wait 2 seconds, retry once.
@@ -99,7 +99,7 @@ export type GeminiResult = GeminiServiceResult | GeminiServiceFallback;
  */
 export async function extractEntitiesWithGemini(corpus: CorpusEntry[]): Promise<GeminiResult> {
   if (!isLlmConfigured()) {
-    return { usedFallback: true, reason: "No LLM configured (set OPENROUTER_API_KEY / OPENAI_API_KEY / LLM_API_KEY or LOCAL_LLM_BASE_URL)" };
+    return { usedFallback: true, reason: "No LLM configured (set OPENROUTER_API_KEY / OPENAI_API_KEY / LLM_API_KEY in Settings or api/.env)" };
   }
 
   try {

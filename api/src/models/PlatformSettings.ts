@@ -35,7 +35,7 @@ const AiSettingsSchema = new Schema<IAiSettings>(
   {
     provider: {
       type: String,
-      enum: ["env", "openrouter", "openai", "nvidia", "custom", "local"],
+      enum: ["env", "openrouter", "openai", "nvidia", "custom"],
       default: "env",
     },
     apiKeyEnc: { type: String, default: "" },

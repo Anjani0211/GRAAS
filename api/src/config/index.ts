@@ -69,9 +69,8 @@ export const config = {
    */
   dispatchWebhookSecret: process.env.DISPATCH_WEBHOOK_SECRET || "",
 
-  // ── LLM (cloud OpenAI-compatible OR local llama.cpp) ──────────────
+  // ── LLM (cloud OpenAI-compatible only) ──────────────
   // Priority: LLM_API_KEY | OPENROUTER_API_KEY | OPENAI_API_KEY | NVIDIA_API_KEY
-  // then fall back to LOCAL_LLM_* (llama.cpp / Ollama).
   ...(() => {
     const openRouterKey = process.env.OPENROUTER_API_KEY || "";
     const openAiKey = process.env.OPENAI_API_KEY || "";
@@ -84,7 +83,7 @@ export const config = {
       if (openRouterKey) llmBaseUrl = "https://openrouter.ai/api/v1";
       else if (nvidiaKey) llmBaseUrl = "https://integrate.api.nvidia.com/v1";
       else if (openAiKey || process.env.LLM_API_KEY) llmBaseUrl = "https://api.openai.com/v1";
-      else llmBaseUrl = (process.env.LOCAL_LLM_BASE_URL || "http://127.0.0.1:8080/v1").replace(/\/$/, "");
+      else llmBaseUrl = "";
     }
 
     const isCloud = Boolean(llmApiKey);
@@ -94,13 +93,10 @@ export const config = {
         ? "meta/llama-3.1-70b-instruct"
         : "gpt-4o-mini";
 
-    const llmModel =
-      process.env.LLM_MODEL ||
-      process.env.LOCAL_LLM_MODEL ||
-      (isCloud ? defaultCloudModel : "gemma2b-cyberpeace-victim-ocr-q4_k_m");
+    const llmModel = process.env.LLM_MODEL || (isCloud ? defaultCloudModel : "");
 
-    const visionEnv = process.env.LLM_VISION_ENABLED ?? process.env.LOCAL_LLM_VISION_ENABLED;
-    const toolsEnv = process.env.LLM_TOOLS_ENABLED ?? process.env.LOCAL_LLM_TOOLS_ENABLED;
+    const visionEnv = process.env.LLM_VISION_ENABLED;
+    const toolsEnv = process.env.LLM_TOOLS_ENABLED;
 
     return {
       /** True when a cloud API key is set (OpenRouter / OpenAI / NVIDIA / LLM_API_KEY). */
@@ -111,24 +107,10 @@ export const config = {
       /** Optional OpenRouter attribution headers */
       openRouterHttpReferer: process.env.OPENROUTER_HTTP_REFERER || "https://graas.local",
       openRouterAppTitle: process.env.OPENROUTER_APP_TITLE || "GRAAS",
-      /** Host path to the GGUF model file (llama-server / docker-compose). */
-      localLlmModelPath: process.env.LOCAL_LLM_MODEL_PATH || "",
-      /** @deprecated use llmBaseUrl — kept for callers/scripts */
-      localLlmBaseUrl: llmBaseUrl,
-      /** @deprecated use llmModel */
-      localLlmModel: llmModel,
-      /**
-       * Vision OCR. Cloud defaults ON; local defaults OFF (text-only GGUF).
-       * Override with LLM_VISION_ENABLED / LOCAL_LLM_VISION_ENABLED.
-       */
-      localLlmVisionEnabled:
-        visionEnv !== undefined ? visionEnv !== "false" : isCloud,
-      /**
-       * LangChain tool-calling agent. Cloud defaults ON; local defaults OFF.
-       * Override with LLM_TOOLS_ENABLED / LOCAL_LLM_TOOLS_ENABLED.
-       */
-      localLlmToolsEnabled:
-        toolsEnv !== undefined ? toolsEnv === "true" : isCloud,
+      /** Vision OCR — defaults ON when a cloud key is present. */
+      llmVisionEnabled: visionEnv !== undefined ? visionEnv !== "false" : isCloud,
+      /** LangChain tool-calling agent — defaults ON when a cloud key is present. */
+      llmToolsEnabled: toolsEnv !== undefined ? toolsEnv === "true" : isCloud,
     };
   })(),
   /** Self-hosted Whisper ASR (port 9002 avoids MinIO on :9000). */
@@ -168,7 +150,7 @@ export const config = {
   /** TGStat Playwright sidecar (empty = telegram stub only). */
   playwrightWorkerUrl: (process.env.PLAYWRIGHT_WORKER_URL || "").replace(/\/$/, ""),
 
-  // Phase 9 — Agent (uses localLlmModel)
+  // Phase 9 — Agent
   agentMaxIterations: parseInt(process.env.AGENT_MAX_ITERATIONS || "40", 10),
   agentIterationTimeoutMs: parseInt(process.env.AGENT_ITERATION_TIMEOUT_MS || "20000", 10),
   agentScreenshotQuality: parseInt(process.env.AGENT_SCREENSHOT_QUALITY || "85", 10),

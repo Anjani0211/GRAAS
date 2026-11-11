@@ -54,11 +54,6 @@ export const AI_PROVIDERS = [
     label: "Custom OpenAI-compatible",
     baseUrl: "",
   },
-  {
-    id: "local",
-    label: "Local (llama.cpp / Ollama)",
-    baseUrl: "http://127.0.0.1:8080/v1",
-  },
 ] as const;
 
 export type AiProviderId = (typeof AI_PROVIDERS)[number]["id"];
