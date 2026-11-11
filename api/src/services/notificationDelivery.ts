@@ -1,4 +1,5 @@
 import { config } from "../config";
+import { secrets } from "./runtimeSettings";
 import { logger } from "../utils/logger";
 
 export type DeliveryResult =
@@ -12,14 +13,15 @@ export async function sendEmail(params: {
   text: string;
   html?: string;
 }): Promise<DeliveryResult> {
-  if (!config.resendApiKey) {
+  const resendApiKey = secrets.resend();
+  if (!resendApiKey) {
     return { delivered: false, provider: "none", reason: "RESEND_API_KEY not configured" };
   }
   try {
     const resp = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${config.resendApiKey}`,
+        Authorization: `Bearer ${resendApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -53,7 +55,8 @@ export async function sendSms(params: {
   to: string;
   message: string;
 }): Promise<DeliveryResult> {
-  if (!config.msg91AuthKey) {
+  const msg91AuthKey = secrets.msg91();
+  if (!msg91AuthKey) {
     return { delivered: false, provider: "none", reason: "MSG91_AUTH_KEY not configured" };
   }
   try {
@@ -71,7 +74,7 @@ export async function sendSms(params: {
     // If no template, use legacy sendhttp API
     if (!config.msg91TemplateId) {
       const qs = new URLSearchParams({
-        authkey: config.msg91AuthKey,
+        authkey: msg91AuthKey,
         mobiles: `91${mobile}`,
         message: params.message.slice(0, 560),
         sender: config.msg91SenderId,
@@ -91,7 +94,7 @@ export async function sendSms(params: {
     const resp = await fetch("https://control.msg91.com/api/v5/flow/", {
       method: "POST",
       headers: {
-        authkey: config.msg91AuthKey,
+        authkey: msg91AuthKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),

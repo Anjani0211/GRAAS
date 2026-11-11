@@ -1,23 +1,27 @@
 import OpenAI from "openai";
 import { ChatOpenAI } from "@langchain/openai";
-import { config } from "../config";
 import { logger } from "../utils/logger";
+import { getEffectiveLlm } from "./runtimeSettings";
 
 /** llama.cpp / Ollama ignore the key; placeholder only. */
 const LOCAL_LLM_DUMMY_KEY = "local";
 
-let loggedProviderOnce = false;
+let loggedFingerprint = "";
 
 function logProviderOnce(): void {
-  if (loggedProviderOnce) return;
-  loggedProviderOnce = true;
+  const llm = getEffectiveLlm();
+  const fingerprint = `${llm.provider}|${llm.baseUrl}|${llm.model}|${llm.isCloud}`;
+  if (loggedFingerprint === fingerprint) return;
+  loggedFingerprint = fingerprint;
   logger.info(
     {
-      provider: config.llmIsCloud ? "cloud" : "local",
-      baseUrl: config.llmBaseUrl,
-      model: config.llmModel,
-      vision: config.localLlmVisionEnabled,
-      tools: config.localLlmToolsEnabled,
+      provider: llm.isCloud ? "cloud" : "local",
+      settingsProvider: llm.provider,
+      baseUrl: llm.baseUrl,
+      model: llm.model,
+      vision: llm.visionEnabled,
+      tools: llm.toolsEnabled,
+      fromSettings: llm.fromSettings,
     },
     "[LLM] Active inference backend",
   );
@@ -25,7 +29,8 @@ function logProviderOnce(): void {
 
 /** True when cloud API key is set, or a local OpenAI-compatible base URL is configured. */
 export function isLlmConfigured(): boolean {
-  return Boolean(config.llmApiKey) || Boolean(config.llmBaseUrl);
+  const llm = getEffectiveLlm();
+  return Boolean(llm.apiKey) || Boolean(llm.baseUrl);
 }
 
 /** @deprecated use isLlmConfigured */
@@ -34,7 +39,7 @@ export function isLocalLlmConfigured(): boolean {
 }
 
 export function getLlmModel(): string {
-  return config.llmModel;
+  return getEffectiveLlm().model;
 }
 
 /** @deprecated use getLlmModel */
@@ -43,12 +48,12 @@ export function getLocalLlmModel(): string {
 }
 
 function defaultHeaders(): Record<string, string> | undefined {
-  if (!config.llmIsCloud) return undefined;
-  // OpenRouter recommends these headers; harmless for other providers.
-  if (config.llmBaseUrl.includes("openrouter.ai")) {
+  const llm = getEffectiveLlm();
+  if (!llm.isCloud) return undefined;
+  if (llm.baseUrl.includes("openrouter.ai")) {
     return {
-      "HTTP-Referer": config.openRouterHttpReferer,
-      "X-Title": config.openRouterAppTitle,
+      "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER || "https://graas.local",
+      "X-Title": process.env.OPENROUTER_APP_TITLE || "GRAAS",
     };
   }
   return undefined;
@@ -56,25 +61,27 @@ function defaultHeaders(): Record<string, string> | undefined {
 
 export function getOpenAIClient(): OpenAI {
   logProviderOnce();
-  const apiKey = config.llmIsCloud ? config.llmApiKey : LOCAL_LLM_DUMMY_KEY;
+  const llm = getEffectiveLlm();
+  const apiKey = llm.isCloud || llm.apiKey ? llm.apiKey || LOCAL_LLM_DUMMY_KEY : LOCAL_LLM_DUMMY_KEY;
   const headers = defaultHeaders();
   return new OpenAI({
     apiKey,
-    baseURL: config.llmBaseUrl,
+    baseURL: llm.baseUrl,
     ...(headers ? { defaultHeaders: headers } : {}),
   });
 }
 
 export function createChatModel(options?: { temperature?: number; timeout?: number }): ChatOpenAI {
   logProviderOnce();
-  const apiKey = config.llmIsCloud ? config.llmApiKey : LOCAL_LLM_DUMMY_KEY;
+  const llm = getEffectiveLlm();
+  const apiKey = llm.isCloud || llm.apiKey ? llm.apiKey || LOCAL_LLM_DUMMY_KEY : LOCAL_LLM_DUMMY_KEY;
   const headers = defaultHeaders();
   return new ChatOpenAI({
-    model: config.llmModel,
+    model: llm.model,
     temperature: options?.temperature ?? 0,
     apiKey,
     configuration: {
-      baseURL: config.llmBaseUrl,
+      baseURL: llm.baseUrl,
       ...(headers ? { defaultHeaders: headers } : {}),
     },
     ...(options?.timeout !== undefined ? { timeout: options.timeout } : {}),

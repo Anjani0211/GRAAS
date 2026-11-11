@@ -18,7 +18,8 @@ import { initPipelineQueue } from "./queues/pipelineQueue";
 import { startPipelineWorker } from "./workers/pipelineWorker";
 import { mountBullBoard } from "./queues/bullBoardSetup";
 import { scheduleRetentionJob } from "./jobs/retentionJob";
-import { isLlmConfigured } from "./services/llmClient";
+import { isLlmConfigured, getLlmModel } from "./services/llmClient";
+import { getEffectiveLlm, refreshRuntimeSettings } from "./services/runtimeSettings";
 import { csrfProtection } from "./middleware/csrf";
 
 const app = express();
@@ -43,17 +44,20 @@ app.use(csrfProtection);
 app.use("/uploads", authenticate, authorize(...ANALYST_ROLES), serveUploads);
 
 app.get("/api/health", (_req, res) => {
+  const llm = getEffectiveLlm();
   res.json({
     status: "healthy",
     service: "GRAAS API",
     stack: "Node.js + MongoDB",
     llm: {
-      configured: Boolean(config.llmApiKey) || Boolean(config.llmBaseUrl),
-      cloud: config.llmIsCloud,
-      model: config.llmModel,
-      baseUrl: config.llmIsCloud ? config.llmBaseUrl : "local",
-      vision: config.localLlmVisionEnabled,
-      tools: config.localLlmToolsEnabled,
+      configured: Boolean(llm.apiKey) || Boolean(llm.baseUrl),
+      cloud: llm.isCloud,
+      model: llm.model,
+      baseUrl: llm.isCloud ? llm.baseUrl : "local",
+      vision: llm.visionEnabled,
+      tools: llm.toolsEnabled,
+      provider: llm.provider,
+      fromSettings: llm.fromSettings,
     },
   });
 });
@@ -68,6 +72,7 @@ app.use((_req, res) => {
 async function start(): Promise<void> {
   validateSecurityConfig();
   await connectDatabase();
+  await refreshRuntimeSettings();
   await redisClient.connect();
   if (
     config.nodeEnv === "production" &&
@@ -85,10 +90,13 @@ async function start(): Promise<void> {
   app.listen(config.port, () => {
     logger.info(`GRAAS API running on http://localhost:${config.port}`);
     logger.info(`Health check: http://localhost:${config.port}/api/health`);
+    const llm = getEffectiveLlm();
     logger.info(
       {
-        llm: isLlmConfigured() ? (config.llmIsCloud ? "cloud" : "local") : "none",
-        model: config.llmModel,
+        llm: isLlmConfigured() ? (llm.isCloud ? "cloud" : "local") : "none",
+        model: getLlmModel(),
+        provider: llm.provider,
+        fromSettings: llm.fromSettings,
       },
       "[Startup] LLM backend",
     );

@@ -53,3 +53,7 @@ export type {
   RecipientPriority,
   RecipientStatus,
 } from "./Dispatch";
+
+export { PlatformSettings, SETTINGS_DOC_ID } from "./PlatformSettings";
+export type { IPlatformSettings, IAiSettings, IStoredKey } from "./PlatformSettings";
+

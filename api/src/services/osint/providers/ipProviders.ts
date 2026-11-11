@@ -3,13 +3,13 @@ import { isIPv4, isIPv6 } from "net";
 import { ConfidenceScore } from "../../../types/confidence";
 import type { OsintResult } from "../providerInterface";
 import { logger } from "../../../utils/logger";
-import { config } from "../../../config";
+import { secrets } from "../../runtimeSettings";
 
 /**
  * AbuseIPDB — abuse score, report count, usage type.
  */
 export async function abuseIpDbLookup(ip: string): Promise<OsintResult> {
-  const key = config.abuseIpDbApiKey;
+  const key = secrets.abuseIpDb();
   if (!key) return noKey("AbuseIPDB");
 
   try {

@@ -25,7 +25,7 @@ import {
   summarizeVtDomainRecord,
   summarizeVtIpRecord,
 } from "./osintExternal";
-import { config } from "../config";
+import { getEffectiveLlm, secrets } from "./runtimeSettings";
 import { logger } from "../utils/logger";
 import { extractEntitiesWithGemini } from "./geminiService";
 import { validateExtractedEntities } from "../utils/entityValidator";
@@ -903,7 +903,8 @@ export async function runInvestigation(
       }
       const classification = await classifyCase(evidenceCorpus);
       pipelineClassification = classification;
-      const runOsintStage = config.localLlmToolsEnabled
+      const toolsEnabled = getEffectiveLlm().toolsEnabled;
+      const runOsintStage = toolsEnabled
         ? () => runInvestigationLoop(caseDoc.caseNumber, runId, evidenceCorpus as EvidenceCorpus, classification, emit)
         : () => runTextOnlyInvestigation(caseDoc.caseNumber, runId, evidenceCorpus as EvidenceCorpus, classification, emit);
 
@@ -911,16 +912,16 @@ export async function runInvestigation(
         type: "stage_log",
         stage: "osint",
         level: "info",
-        message: config.localLlmToolsEnabled
+        message: toolsEnabled
           ? "OSINT mode: agent tool-calling loop"
           : "OSINT mode: victim-OCR text analysis + programmatic enrichment",
         at: nowIso(),
       });
 
       investigationMemory = await runWithRetry(runOsintStage, {
-        maxRetries: config.localLlmToolsEnabled ? 2 : 0,
+        maxRetries: toolsEnabled ? 2 : 0,
         backoffMs: 1000,
-        stageName: config.localLlmToolsEnabled ? "osint-agent-loop" : "osint-text-analysis",
+        stageName: toolsEnabled ? "osint-agent-loop" : "osint-text-analysis",
         emitLog: (msg) =>
           emit({
             type: "stage_log",
@@ -1245,7 +1246,7 @@ export async function runAdHocTool(kind: ToolKind, query: string): Promise<
   | { ok: false; status: number; error: string }
 > {
   if (kind === "whois") {
-    if (!config.whoisxmlApiKey) {
+    if (!secrets.whoisxml()) {
       return {
         ok: true,
         provider: "mock",
@@ -1262,7 +1263,7 @@ export async function runAdHocTool(kind: ToolKind, query: string): Promise<
   }
 
   if (kind === "ip") {
-    if (!config.virustotalApiKey) {
+    if (!secrets.virustotal()) {
       return {
         ok: true,
         provider: "mock",
@@ -1275,7 +1276,7 @@ export async function runAdHocTool(kind: ToolKind, query: string): Promise<
   }
 
   if (kind === "urlscan") {
-    if (!config.virustotalApiKey) {
+    if (!secrets.virustotal()) {
       return {
         ok: true,
         provider: "mock",
@@ -1288,7 +1289,7 @@ export async function runAdHocTool(kind: ToolKind, query: string): Promise<
   }
 
   // shodan
-  if (!config.shodanApiKey) {
+  if (!secrets.shodan()) {
     return {
       ok: true,
       provider: "mock",
@@ -1300,7 +1301,7 @@ export async function runAdHocTool(kind: ToolKind, query: string): Promise<
     };
   }
   try {
-    const url = `https://api.shodan.io/shodan/host/search?key=${encodeURIComponent(config.shodanApiKey)}&query=${encodeURIComponent(query)}`;
+    const url = `https://api.shodan.io/shodan/host/search?key=${encodeURIComponent(secrets.shodan())}&query=${encodeURIComponent(query)}`;
     const resp = await fetch(url, { signal: AbortSignal.timeout(15_000) });
     if (!resp.ok) {
       return { ok: false, status: resp.status, error: `Shodan HTTP ${resp.status}` };

@@ -1,4 +1,4 @@
-import { config } from "../config";
+import { secrets } from "./runtimeSettings";
 
 const WHOIS_XML_URL = "https://www.whoisxmlapi.com/whoisserver/WhoisService";
 const VT_BASE = "https://www.virustotal.com/api/v3";
@@ -26,7 +26,7 @@ export function extractHostFromUrlOrDomain(input: string): string {
 }
 
 export async function fetchWhoisXml(domain: string): Promise<{ ok: true; data: unknown } | { ok: false; status: number; error: string }> {
-  const apiKey = config.whoisxmlApiKey;
+  const apiKey = secrets.whoisxml();
   if (!apiKey) {
     return { ok: false, status: 503, error: "WHOISXML_API_KEY is not configured" };
   }
@@ -56,7 +56,7 @@ export async function fetchWhoisXml(domain: string): Promise<{ ok: true; data: u
 }
 
 async function vtGet(path: string): Promise<{ ok: true; data: unknown } | { ok: false; status: number; error: string }> {
-  const apiKey = config.virustotalApiKey;
+  const apiKey = secrets.virustotal();
   if (!apiKey) {
     return { ok: false, status: 503, error: "VIRUSTOTAL_API_KEY is not configured" };
   }

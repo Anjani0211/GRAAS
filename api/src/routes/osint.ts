@@ -9,7 +9,7 @@ import { Case, EvidenceHash, type IOsintInvestigation, SENIOR_ANALYST_ROLES, Pip
 import { buildReport, loadAgentReportAppendix, ReportBuildError } from "../services/reportBuilder";
 import { generatePdf } from "../services/pdfService";
 import { generateDocx, investigationReportFilename } from "../services/docxService";
-import { config } from "../config";
+import { secrets } from "../services/runtimeSettings";
 import { fetchWhoisXml, fetchVtIp, fetchVtUrlReputation } from "../services/osintExternal";
 import {
   runInvestigation as runPipeline,
@@ -621,7 +621,7 @@ router.get("/whois", async (req: Request, res: Response) => {
     return;
   }
 
-  if (config.whoisxmlApiKey) {
+  if (secrets.whoisxml()) {
     const result = await fetchWhoisXml(domain);
     if (!result.ok) {
       res.status(result.status).json({ error: result.error, provider: "whoisxml" });
@@ -656,7 +656,7 @@ router.get("/ip", async (req: Request, res: Response) => {
     return;
   }
 
-  if (config.virustotalApiKey) {
+  if (secrets.virustotal()) {
     const result = await fetchVtIp(ip);
     if (!result.ok) {
       res.status(result.status).json({ error: result.error, provider: "virustotal" });
@@ -689,7 +689,7 @@ router.get("/urlscan", async (req: Request, res: Response) => {
     return;
   }
 
-  if (config.virustotalApiKey) {
+  if (secrets.virustotal()) {
     const result = await fetchVtUrlReputation(url);
     if (!result.ok) {
       res.status(result.status).json({ error: result.error, provider: "virustotal" });
@@ -718,7 +718,7 @@ router.get("/shodan", async (req: Request, res: Response) => {
     res.status(400).json({ error: "query parameter required" });
     return;
   }
-  if (!config.shodanApiKey) {
+  if (!secrets.shodan()) {
     res.json({
       mock: true,
       note: "Set SHODAN_API_KEY for live Shodan data — demo payload only",
@@ -729,7 +729,7 @@ router.get("/shodan", async (req: Request, res: Response) => {
     return;
   }
   try {
-    const url = `https://api.shodan.io/shodan/host/search?key=${encodeURIComponent(config.shodanApiKey)}&query=${encodeURIComponent(query)}`;
+    const url = `https://api.shodan.io/shodan/host/search?key=${encodeURIComponent(secrets.shodan())}&query=${encodeURIComponent(query)}`;
     const resp = await fetch(url, { signal: AbortSignal.timeout(15_000) });
     if (!resp.ok) {
       res.status(502).json({ error: `Shodan HTTP ${resp.status}`, mock: false });

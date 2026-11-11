@@ -1,8 +1,8 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
-import { config } from "../config";
 import { CATEGORIES } from "../models";
 import { getLlmModel, getOpenAIClient, isLlmConfigured } from "../services/llmClient";
+import { getEffectiveLlm } from "../services/runtimeSettings";
 import { logger } from "../utils/logger";
 
 const router = Router();
@@ -179,7 +179,8 @@ router.post("/", async (req: Request, res: Response) => {
   try {
     const data = TriageSchema.parse(req.body);
 
-    if (isLlmConfigured() && config.llmIsCloud) {
+    const llm = getEffectiveLlm();
+    if (isLlmConfigured() && llm.isCloud) {
       try {
         const result = await llmTriage(data);
         res.json(result);
@@ -190,7 +191,7 @@ router.post("/", async (req: Request, res: Response) => {
           "[Triage] LLM failed — keyword fallback",
         );
       }
-    } else if (isLlmConfigured() && !config.llmIsCloud) {
+    } else if (isLlmConfigured() && !llm.isCloud) {
       // Local small models are unreliable for structured triage — keep keyword, try LLM best-effort.
       try {
         const result = await llmTriage(data);

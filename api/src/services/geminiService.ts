@@ -1,10 +1,10 @@
-import { config } from "../config";
 import { logger } from "../utils/logger";
 import {
   GeminiExtractionResultSchema,
   type GeminiExtractionResult,
 } from "../utils/entityValidator";
 import { getLlmModel, getOpenAIClient, isLlmConfigured } from "./llmClient";
+import { getEffectiveLlm } from "./runtimeSettings";
 
 // ── System prompt — extraction ONLY, no inference ──
 
@@ -138,7 +138,7 @@ export async function ocrImageWithGemini(
   imageBuffer: Buffer,
   mimeType: string,
 ): Promise<string> {
-  if (!isLlmConfigured() || !config.localLlmVisionEnabled) return "";
+  if (!isLlmConfigured() || !getEffectiveLlm().visionEnabled) return "";
 
   try {
     const client = getOpenAIClient();

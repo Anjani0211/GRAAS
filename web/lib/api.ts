@@ -732,6 +732,89 @@ export const adminApi = {
       { method: "PATCH", body: JSON.stringify(body) },
     );
   },
+
+  getSettings() {
+    return apiFetch<{
+      ai: {
+        provider: string;
+        baseUrl: string;
+        model: string;
+        visionEnabled: boolean;
+        toolsEnabled: boolean;
+        fromSettings: boolean;
+        hasApiKey: boolean;
+        apiKeyMasked: string;
+        isCloud: boolean;
+      };
+      providers: Array<{ id: string; label: string; baseUrl: string }>;
+      catalog: Array<{ id: string; label: string; group: string; hint?: string }>;
+      keys: Array<{
+        id: string;
+        label: string;
+        group: string;
+        configured: boolean;
+        source: "settings" | "env" | "none";
+        masked: string;
+        custom?: boolean;
+        hint?: string;
+      }>;
+    }>("/admin/settings");
+  },
+
+  updateAiSettings(body: {
+    provider: string;
+    apiKey?: string;
+    clearApiKey?: boolean;
+    baseUrl?: string;
+    model?: string;
+    visionEnabled?: boolean | null;
+    toolsEnabled?: boolean | null;
+  }) {
+    return apiFetch<{ ok: boolean; ai: Record<string, unknown> }>("/admin/settings/ai", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  },
+
+  updateIntegrationKey(body: { id: string; value?: string; clear?: boolean; label?: string }) {
+    return apiFetch<{
+      ok: boolean;
+      keys: Array<{
+        id: string;
+        label: string;
+        group: string;
+        configured: boolean;
+        source: "settings" | "env" | "none";
+        masked: string;
+        custom?: boolean;
+        hint?: string;
+      }>;
+    }>("/admin/settings/keys", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  },
+
+  deleteIntegrationKey(id: string) {
+    return apiFetch<{ ok: boolean; keys: Array<Record<string, unknown>> }>(
+      `/admin/settings/keys/${encodeURIComponent(id)}`,
+      { method: "DELETE" },
+    );
+  },
+
+  testAiSettings(model?: string) {
+    return apiFetch<{
+      ok: boolean;
+      model?: string;
+      provider?: string;
+      baseUrl?: string;
+      reply?: string;
+      error?: string;
+    }>("/admin/settings/ai/test", {
+      method: "POST",
+      body: JSON.stringify(model ? { model } : {}),
+    });
+  },
 };
 
 

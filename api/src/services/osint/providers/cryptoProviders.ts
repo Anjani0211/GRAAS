@@ -3,7 +3,7 @@ import { ConfidenceScore } from "../../../types/confidence";
 import type { OsintResult } from "../providerInterface";
 import { logger } from "../../../utils/logger";
 import { maskWallet } from "../../../utils/piiSanitizer";
-import { config } from "../../../config";
+import { secrets } from "../../runtimeSettings";
 
 function detectChain(address: string): "BTC" | "ETH" | "TRX" | "UNKNOWN" {
   if (/^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,62}$/.test(address)) return "BTC";
@@ -55,7 +55,7 @@ export async function blockstreamBtcLookup(address: string): Promise<OsintResult
  * Etherscan — ETH/ERC-20 balance + transaction history.
  */
 export async function etherscanLookup(address: string): Promise<OsintResult> {
-  const key = config.etherscanApiKey;
+  const key = secrets.etherscan();
   if (!key) return noKey("Etherscan");
 
   try {

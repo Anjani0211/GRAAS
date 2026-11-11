@@ -2,8 +2,11 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { AuditLog, Case, RetentionAudit, type AuditAction, type RetentionAuditAction } from "../models";
 import { runRetentionCycle, getRetentionPreview } from "../jobs/retentionJob";
+import adminSettingsRouter from "./adminSettings";
 
 const router = Router();
+
+router.use("/settings", adminSettingsRouter);
 
 const ListAuditQuerySchema = z.object({
   action: z.string().optional(),

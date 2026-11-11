@@ -2,7 +2,7 @@ import { safeHttp } from "../../../utils/httpClient";
 import { ConfidenceScore } from "../../../types/confidence";
 import type { OsintResult } from "../providerInterface";
 import { logger } from "../../../utils/logger";
-import { config } from "../../../config";
+import { secrets } from "../../runtimeSettings";
 import { fetchVtUrlReputation, fetchWhoisXml } from "../../osintExternal";
 
 /**
@@ -10,7 +10,7 @@ import { fetchVtUrlReputation, fetchWhoisXml } from "../../osintExternal";
  * Already integrated in Phase 1; upgraded here to propagate flags.
  */
 export async function virusTotalUrlLookup(url: string): Promise<OsintResult> {
-  if (!config.virustotalApiKey) return noKey("VirusTotal");
+  if (!secrets.virustotal()) return noKey("VirusTotal");
 
   try {
     const res = await fetchVtUrlReputation(url);
@@ -58,7 +58,7 @@ export async function virusTotalUrlLookup(url: string): Promise<OsintResult> {
  * URLScan.io — scans URL and returns DOM, screenshot URL, DNS records.
  */
 export async function urlScanLookup(url: string): Promise<OsintResult> {
-  const key = config.urlScanApiKey;
+  const key = secrets.urlScan();
   if (!key) return noKey("URLScan.io");
 
   try {
@@ -113,7 +113,7 @@ export async function urlScanLookup(url: string): Promise<OsintResult> {
  * WhoisXML — domain registrar, creation date, age.
  */
 export async function whoisXmlDomainLookup(domain: string): Promise<OsintResult> {
-  if (!config.whoisxmlApiKey) return noKey("WhoisXML");
+  if (!secrets.whoisxml()) return noKey("WhoisXML");
 
   try {
     const res = await fetchWhoisXml(domain);

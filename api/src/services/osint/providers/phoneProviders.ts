@@ -3,14 +3,14 @@ import { ConfidenceScore } from "../../../types/confidence";
 import type { OsintResult } from "../providerInterface";
 import { logger } from "../../../utils/logger";
 import { mask } from "../../../utils/piiSanitizer";
-import { config } from "../../../config";
+import { secrets } from "../../runtimeSettings";
 
 /**
  * NumVerify phone validation — carrier, country, line type.
  * PII rule: only sends last 7 digits to non-Indian APIs.
  */
 export async function numVerifyLookup(phone: string): Promise<OsintResult> {
-  const key = config.numVerifyApiKey;
+  const key = secrets.numVerify();
   if (!key) return noKey("NumVerify");
 
   try {

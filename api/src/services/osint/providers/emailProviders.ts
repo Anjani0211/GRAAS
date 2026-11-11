@@ -5,13 +5,13 @@ import { ConfidenceScore } from "../../../types/confidence";
 import type { OsintResult } from "../providerInterface";
 import { logger } from "../../../utils/logger";
 import { maskEmail } from "../../../utils/piiSanitizer";
-import { config } from "../../../config";
+import { secrets } from "../../runtimeSettings";
 
 /**
  * HaveIBeenPwned v3 — returns list of breaches the email was involved in.
  */
 export async function hibpLookup(email: string): Promise<OsintResult> {
-  const key = config.haveIBeenPwnedApiKey;
+  const key = secrets.hibp();
   if (!key) return noKey("HIBP");
 
   try {
@@ -59,7 +59,7 @@ export async function hibpLookup(email: string): Promise<OsintResult> {
  * Hunter.io — email deliverability, domain verification, role detection.
  */
 export async function hunterEmailLookup(email: string): Promise<OsintResult> {
-  const key = config.hunterIoApiKey;
+  const key = secrets.hunter();
   if (!key) return noKey("Hunter.io");
 
   try {
