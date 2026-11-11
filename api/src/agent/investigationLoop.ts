@@ -366,7 +366,7 @@ export async function runInvestigationLoop(
         continue;
       }
       try {
-        const output = await lc.invoke(args as never);
+        const output = await (lc as { invoke: (input: unknown) => Promise<unknown> }).invoke(args);
         resultLines.push(`${name}: ${String(output).slice(0, 2000)}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
