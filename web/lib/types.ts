@@ -66,7 +66,8 @@ export type OsintEntityType =
   | "domain"
   | "ipv4"
   | "wallet"
-  | "telegram";
+  | "telegram"
+  | "username";
 
 export type OsintConfidence = "VERIFIED" | "HIGH" | "MEDIUM" | "LOW" | "UNVERIFIED";
 

@@ -12,6 +12,7 @@ const ENTITY_LABEL: Record<string, string> = {
   email:    "Email",
   wallet:   "CryptoWallet",
   telegram: "TelegramID",
+  username: "Username",
 };
 
 function entityTypeToLabel(type: string): string {

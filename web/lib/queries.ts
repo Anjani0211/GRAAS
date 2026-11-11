@@ -166,6 +166,23 @@ export function useTeamUsers() {
   });
 }
 
+export function useCreateStaff() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      name: string;
+      email: string;
+      password: string;
+      phone?: string;
+      badgeId?: string;
+      role: string;
+    }) => authApi.createStaff(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["teamUsers"] });
+    },
+  });
+}
+
 export function useTriage() {
   return useMutation({
     mutationFn: ({

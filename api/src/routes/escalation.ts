@@ -81,13 +81,14 @@ router.post("/", async (req: Request, res: Response) => {
 
     await logEvent({
       userId: req.auth?.userId ?? "system",
-      action: "LE_SUBMIT",
+      action: "ESCALATION_DRAFT",
       resourceId: doc.caseNumber,
       outcome: "SUCCESS",
       ip: req.ip ?? "unknown",
       metadata: {
         escalationType: data.actionType,
         platformTarget: data.platformTarget ?? "",
+        delivery: "manual",
       },
     });
 

@@ -29,7 +29,7 @@ import { logger } from "../utils/logger";
 
 const router = Router();
 
-const ENTITY_TYPES = ["phone", "upi", "email", "url", "domain", "ipv4", "wallet", "telegram"] as const;
+const ENTITY_TYPES = ["phone", "upi", "email", "url", "domain", "ipv4", "wallet", "telegram", "username"] as const;
 const CONFIDENCES = ["VERIFIED", "HIGH", "MEDIUM", "LOW", "UNVERIFIED"] as const;
 
 const FiltersQ = z.object({

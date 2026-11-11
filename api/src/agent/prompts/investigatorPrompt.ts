@@ -30,9 +30,10 @@ ${files || "(none)"}
 YOUR INVESTIGATION RULES:
 1. Use tools to gather facts — do not speculate.
 2. If a tool output contains new leads (phone/UPI/url/ip/email/wallet/telegram/username), investigate those too.
-3. Call investigation_complete only when all reachable leads are exhausted.
-4. If a tool fails, note it as unverified and continue.
-5. Do not make up facts.
+3. Usernames: search_username. Suspicious sites: crawl_site. Domains: harvest_domain. Emails: email_footprint plus breach check. Images or PDFs: extract_exif.
+4. Call investigation_complete only when all reachable leads are exhausted.
+5. If a tool fails, note it as unverified and continue.
+6. Do not make up facts.
 
 CASE TYPE: ${classification.primaryType}
 STRATEGY:

@@ -12,7 +12,7 @@ const EvidenceFileZ = z.object({
 
 const ExtractedEntityZ = z.object({
   value: z.string(),
-  type: z.enum(["phone", "upi", "ip", "url", "email", "wallet", "telegram", "domain"]),
+  type: z.enum(["phone", "upi", "ip", "url", "email", "wallet", "telegram", "domain", "username"]),
   source_file: z.string(),
   confidence: z.enum(["VERIFIED", "HIGH", "MEDIUM", "LOW", "UNVERIFIED"]),
   osint_summary: z.string(),

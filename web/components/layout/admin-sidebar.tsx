@@ -20,6 +20,7 @@ import {
   Radar,
   Network,
   ScrollText,
+  X,
 } from "lucide-react";
 
 const baseNav = [
@@ -39,7 +40,7 @@ const adminOnlyNav = [
 export function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { collapsed, toggle } = useSidebarStore();
+  const { collapsed, toggle, mobileOpen, setMobileOpen } = useSidebarStore();
   const { logout, user } = useAuthStore();
   const { data: stats } = useCaseStats();
   const { data: osintQueue } = useOsintQueue();
@@ -50,122 +51,206 @@ export function AdminSidebar() {
     osint: osintQueue?.length ?? 0,
   };
 
-  return (
-    <motion.aside
-      initial={false}
-      animate={{ width: collapsed ? 64 : 256 }}
-      transition={{ duration: 0.2, ease: "easeInOut" }}
-      className="fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-black/[0.08] bg-card"
-    >
-      <div
-        className={cn(
-          "flex min-h-[5rem] shrink-0 items-center border-b border-black/[0.06] py-3 sm:py-3.5",
-          collapsed ? "px-2" : "px-4",
-        )}
-      >
-        <Link
-          href="/admin/dashboard"
+  function closeMobile() {
+    setMobileOpen(false);
+  }
+
+  function renderRail(opts: { compact: boolean; showMobileClose?: boolean; showCollapse?: boolean }) {
+    const compact = opts.compact;
+    return (
+      <>
+        <div
           className={cn(
-            "flex min-h-0 min-w-0 w-full flex-1 items-center transition-opacity hover:opacity-90",
-            collapsed ? "justify-center" : "justify-start rounded-lg",
+            "flex min-h-[5rem] shrink-0 items-center border-b border-black/[0.06] py-3 sm:py-3.5",
+            compact ? "px-2" : "px-4",
           )}
         >
-          <BrandLogo variant={collapsed ? "adminCompact" : "admin"} />
-        </Link>
-      </div>
+          <Link
+            href="/admin/dashboard"
+            onClick={closeMobile}
+            className={cn(
+              "flex min-h-0 min-w-0 w-full flex-1 items-center transition-opacity hover:opacity-90",
+              compact ? "justify-center" : "justify-start rounded-lg",
+            )}
+          >
+            <BrandLogo variant={compact ? "adminCompact" : "admin"} />
+          </Link>
+          {opts.showMobileClose && (
+            <button
+              type="button"
+              className="ml-2 rounded-lg p-2 text-muted-foreground hover:bg-muted"
+              aria-label="Close menu"
+              onClick={closeMobile}
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
 
-      <nav
-        className={cn(
-          "flex flex-1 flex-col overflow-y-auto overflow-x-hidden",
-          collapsed ? "gap-1 p-3" : "gap-1.5 px-3 py-4 sm:px-4",
-        )}
-      >
-        {navItems.map((item) => {
-          const isActive =
-            item.href === "/admin/osint"
-              ? pathname.startsWith("/admin/osint")
-              : pathname.startsWith(item.href);
-          const badgeCount = item.badgeKey ? badges[item.badgeKey] || 0 : 0;
-          return (
-            <Link
+        <nav
+          className={cn(
+            "flex flex-1 flex-col overflow-y-auto overflow-x-hidden",
+            compact ? "gap-1 p-3" : "gap-1.5 px-3 py-4 sm:px-4",
+          )}
+        >
+          <p
+            className={cn(
+              "font-mono-technical px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground",
+              compact && "sr-only",
+            )}
+          >
+            Operations
+          </p>
+          {navItems.slice(0, 5).map((item) => (
+            <NavLink
               key={item.href}
-              href={item.href}
+              item={item}
+              pathname={pathname}
+              collapsed={compact}
+              badgeCount={item.badgeKey ? badges[item.badgeKey] || 0 : 0}
+              onNavigate={closeMobile}
+            />
+          ))}
+          {isAdminRole(user?.role) && (
+            <>
+              <p
+                className={cn(
+                  "font-mono-technical mt-3 px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground",
+                  compact && "sr-only",
+                )}
+              >
+                Admin
+              </p>
+              {navItems.slice(5).map((item) => (
+                <NavLink
+                  key={item.href}
+                  item={item}
+                  pathname={pathname}
+                  collapsed={compact}
+                  badgeCount={0}
+                  onNavigate={closeMobile}
+                />
+              ))}
+            </>
+          )}
+        </nav>
+
+        <div className={cn("mt-auto border-t border-black/[0.06]", compact ? "p-3" : "p-4")}>
+          <div className={cn("flex flex-col", compact ? "gap-2" : "gap-2.5")}>
+            {!compact && user && (
+              <p className="truncate px-0.5 text-xs font-medium text-foreground/80">{user.name}</p>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                void logout().then(() => router.push("/login"));
+              }}
               className={cn(
-                "flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200",
-                collapsed ? "justify-center px-2 py-2.5" : "px-4 py-3",
-                isActive
-                  ? "bg-muted text-primary stitch-ambient ring-1 ring-black/[0.06]"
-                  : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
+                "flex w-full items-center gap-2 rounded-lg text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-destructive",
+                compact ? "h-9 justify-center px-2" : "justify-start px-2.5 py-2.5",
               )}
             >
-              <span className="relative shrink-0">
-                <item.icon className="size-5" aria-hidden />
-                {collapsed && badgeCount > 0 && (
-                  <span className="absolute -right-1.5 -top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
-                    {badgeCount > 9 ? "9+" : badgeCount}
-                  </span>
+              <LogOut className="size-4 shrink-0" aria-hidden />
+              {!compact && <span>Sign out</span>}
+            </button>
+            {opts.showCollapse && (
+              <button
+                type="button"
+                onClick={toggle}
+                title={compact ? "Expand sidebar" : "Collapse sidebar"}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-xl border border-black/[0.07] bg-card text-xs font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground",
+                  compact ? "h-9 justify-center px-2" : "h-10 justify-start px-3 py-2.5",
                 )}
-              </span>
-              <AnimatePresence mode="wait">
-                {!collapsed && (
-                  <motion.span
-                    initial={{ opacity: 0, width: 0 }}
-                    animate={{ opacity: 1, width: "auto" }}
-                    exit={{ opacity: 0, width: 0 }}
-                    className="flex min-w-0 flex-1 items-center justify-between gap-2 overflow-hidden whitespace-nowrap"
-                  >
-                    <span>{item.label}</span>
-                    {badgeCount > 0 && (
-                      <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-mono-technical text-[10px] font-semibold text-primary">
-                        {badgeCount > 99 ? "99+" : badgeCount}
-                      </span>
-                    )}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </Link>
-          );
-        })}
-      </nav>
+              >
+                {compact ? <PanelLeft className="size-4" aria-hidden /> : <PanelLeftClose className="size-4 shrink-0" aria-hidden />}
+                {!compact && <span>Collapse sidebar</span>}
+              </button>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
 
-      <div
+  return (
+    <>
+      <motion.aside
+        initial={false}
+        animate={{ width: collapsed ? 64 : 256 }}
+        transition={{ duration: 0.2, ease: "easeInOut" }}
+        className="fixed left-0 top-0 z-40 hidden h-screen flex-col border-r border-black/[0.08] bg-card md:flex"
+      >
+        {renderRail({ compact: collapsed, showCollapse: true })}
+      </motion.aside>
+
+      <aside
         className={cn(
-          "mt-auto border-t border-black/[0.06]",
-          collapsed ? "p-3" : "p-4",
+          "fixed left-0 top-0 z-50 flex h-screen w-72 flex-col border-r border-black/[0.08] bg-card transition-transform duration-200 md:hidden",
+          mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className={cn("flex flex-col", collapsed ? "gap-2" : "gap-2.5")}>
-          {!collapsed && user && (
-            <p className="truncate px-0.5 text-xs font-medium text-foreground/80">{user.name}</p>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              void logout().then(() => router.push("/login"));
-            }}
-            className={cn(
-              "flex w-full items-center gap-2 rounded-lg text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-destructive",
-              collapsed ? "h-9 justify-center px-2" : "justify-start px-2.5 py-2.5",
-            )}
+        {renderRail({ compact: false, showMobileClose: true })}
+      </aside>
+    </>
+  );
+}
+
+function NavLink({
+  item,
+  pathname,
+  collapsed,
+  badgeCount,
+  onNavigate,
+}: {
+  item: (typeof baseNav)[number];
+  pathname: string;
+  collapsed: boolean;
+  badgeCount: number;
+  onNavigate: () => void;
+}) {
+  const isActive =
+    item.href === "/admin/osint"
+      ? pathname.startsWith("/admin/osint")
+      : pathname.startsWith(item.href);
+
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      className={cn(
+        "flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200",
+        collapsed ? "justify-center px-2 py-2.5" : "px-4 py-3",
+        isActive
+          ? "bg-muted text-primary stitch-ambient ring-1 ring-black/[0.06]"
+          : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
+      )}
+    >
+      <span className="relative shrink-0">
+        <item.icon className="size-5" aria-hidden />
+        {collapsed && badgeCount > 0 && (
+          <span className="absolute -right-1.5 -top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+            {badgeCount > 9 ? "9+" : badgeCount}
+          </span>
+        )}
+      </span>
+      <AnimatePresence mode="wait">
+        {!collapsed && (
+          <motion.span
+            initial={{ opacity: 0, width: 0 }}
+            animate={{ opacity: 1, width: "auto" }}
+            exit={{ opacity: 0, width: 0 }}
+            className="flex min-w-0 flex-1 items-center justify-between gap-2 overflow-hidden whitespace-nowrap"
           >
-            <LogOut className="size-4 shrink-0" aria-hidden />
-            {!collapsed && <span>Sign out</span>}
-          </button>
-          <button
-            type="button"
-            onClick={toggle}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className={cn(
-              "flex w-full items-center gap-2 rounded-xl border bg-card text-xs font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground",
-              "border-black/[0.07]",
-              collapsed ? "h-9 justify-center px-2" : "h-10 justify-start px-3 py-2.5",
+            <span>{item.label}</span>
+            {badgeCount > 0 && (
+              <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-mono-technical text-[10px] font-semibold text-primary">
+                {badgeCount > 99 ? "99+" : badgeCount}
+              </span>
             )}
-          >
-            {collapsed ? <PanelLeft className="size-4" aria-hidden /> : <PanelLeftClose className="size-4 shrink-0" aria-hidden />}
-            {!collapsed && <span>Collapse sidebar</span>}
-          </button>
-        </div>
-      </div>
-    </motion.aside>
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </Link>
   );
 }

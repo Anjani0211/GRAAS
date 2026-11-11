@@ -22,10 +22,10 @@ type Role = "victim" | "staff";
  * Optional dev convenience: when these are set in web/.env.local, the login
  * page shows the seeded admin credentials. Never rendered in production.
  */
+/** Dev-only email hint — never ship passwords in the client bundle. */
 const DEMO_ADMIN_EMAIL = process.env.NEXT_PUBLIC_DEMO_ADMIN_EMAIL ?? "";
-const DEMO_ADMIN_PASSWORD = process.env.NEXT_PUBLIC_DEMO_ADMIN_PASSWORD ?? "";
 const SHOW_DEMO_CREDENTIALS =
-  process.env.NODE_ENV !== "production" && Boolean(DEMO_ADMIN_EMAIL && DEMO_ADMIN_PASSWORD);
+  process.env.NODE_ENV !== "production" && Boolean(DEMO_ADMIN_EMAIL);
 
 /** Open redirect-safe: only same-app relative paths, role-appropriate prefix. */
 function postAuthDestination(user: User): string {
@@ -320,8 +320,8 @@ export default function LoginPage() {
 
             {mode === "login" && SHOW_DEMO_CREDENTIALS && (
               <p className="mt-4 text-center text-xs text-muted-foreground">
-                Dev seed: <span className="font-mono">{DEMO_ADMIN_EMAIL}</span> /{" "}
-                <span className="font-mono">{DEMO_ADMIN_PASSWORD}</span>
+                Dev seed email: <span className="font-mono">{DEMO_ADMIN_EMAIL}</span>
+                {" "}(password from <span className="font-mono">make seed</span> / SETUP.md — not shown here)
               </p>
             )}
           </CardContent>

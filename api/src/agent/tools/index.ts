@@ -6,4 +6,5 @@ export { checkEmailBreachTool } from "./emailTools";
 export { traceCryptoWalletTool } from "./cryptoTools";
 export { searchUsernameTool, analyzeApkTool, lookupTelegramIdTool, captureWebsiteTool } from "./dockerTools";
 export { extractExifTool } from "./exifTool";
+export { crawlSiteTool, emailFootprintTool, harvestDomainTool } from "./reconTools";
 export { checkCrossCaseMatchesTool } from "./neo4jTools";

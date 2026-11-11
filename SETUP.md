@@ -117,9 +117,14 @@ curl -X POST http://localhost:8000/api/auth/register \
 | `victim`        | Submit complaint, track case                        |
 | `intake_officer`| View cases, triage                                  |
 | `osint_analyst` | OSINT queue, run pipeline, ad-hoc tools             |
+| `case_manager`  | Case assignment, status updates, victim messaging   |
+| `legal_team`    | Escalation drafts, support coordination             |
 | `senior_analyst`| Finalize reports, HITL badge, export PDF            |
-| `le_portal`     | Law enforcement read-only access                    |
-| `admin`         | Full access + register users + audit views          |
+| `le_portal`     | Law enforcement read-only access (admin UI today)   |
+| `admin`         | Full access + create staff + audit + settings       |
+| `super_admin`   | Same as admin (break-glass elevated role)           |
+
+Staff accounts are created from **Team → Add staff** (does not switch your session). Public `/login` register is victim-only.
 
 ---
 
@@ -144,8 +149,8 @@ curl -X POST http://localhost:8000/api/auth/register \
 
 ## OSINT API Keys — Where to Get Them
 
-Fill these in `api/.env`. The system works without them (falls back gracefully),
-but fuller key coverage = higher confidence scores.
+Fill these in `api/.env` (or Admin → Settings). Without keys, enrichment returns
+`mock: true` demo payloads — the UI labels them; do not treat them as live intel.
 
 | Key                   | Where to Get                              | Cost        |
 |-----------------------|-------------------------------------------|-------------|

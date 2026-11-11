@@ -113,6 +113,7 @@ const ENTITY_TYPE_WEIGHT: Record<OsintEntityType, number> = {
   domain: 1.05,
   ipv4: 0.9,
   telegram: 0.95,
+  username: 0.85,
 };
 
 const SEVERITY_WEIGHT: Record<NonNullable<CaseTouch["caseSeverity"]>, number> =

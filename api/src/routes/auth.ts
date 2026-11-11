@@ -23,7 +23,11 @@ const router = Router();
 const RegisterSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z
+    .string()
+    .min(8)
+    .regex(/[A-Za-z]/, "Password must include a letter")
+    .regex(/[0-9]/, "Password must include a number"),
   phone: z.string().optional(),
   badgeId: z.string().optional(),
   role: z
@@ -97,10 +101,16 @@ router.post("/register", optionalAuth, async (req: Request, res: Response) => {
 
     logger.info({ userId: user.id, role: user.role, createdBy: creatorId }, "[Auth] New user registered");
 
-    const token = signToken(user.id as string, user.role);
-    setAuthCookie(res, token);
-    // Token still returned for API clients; browsers should rely on httpOnly cookie.
-    res.status(201).json({ token, user: user.toJSON() });
+    // Only self-registration (public victim signup) should switch the browser session.
+    // Admin-created staff must NOT overwrite the admin's httpOnly cookie.
+    if (!isAdminRequest) {
+      const token = signToken(user.id as string, user.role);
+      setAuthCookie(res, token);
+      res.status(201).json({ token, user: user.toJSON() });
+      return;
+    }
+
+    res.status(201).json({ user: user.toJSON() });
   } catch (err) {
     if (err instanceof z.ZodError) {
       res.status(400).json({ error: "Validation failed", details: err.issues });

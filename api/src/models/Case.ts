@@ -49,7 +49,8 @@ export type OsintEntityType =
   | "domain"
   | "ipv4"
   | "wallet"
-  | "telegram";
+  | "telegram"
+  | "username";
 
 export type OsintConfidence = "VERIFIED" | "HIGH" | "MEDIUM" | "LOW" | "UNVERIFIED";
 
@@ -276,7 +277,7 @@ const OsintEntitySchema = new Schema<IOsintEntity>(
     id: { type: String, required: true },
     type: {
       type: String,
-      enum: ["phone", "upi", "email", "url", "domain", "ipv4", "wallet", "telegram"],
+      enum: ["phone", "upi", "email", "url", "domain", "ipv4", "wallet", "telegram", "username"],
       required: true,
     },
     value: { type: String, required: true },

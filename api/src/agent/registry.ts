@@ -13,6 +13,9 @@ import {
   captureWebsiteTool,
   extractExifTool,
   checkCrossCaseMatchesTool,
+  crawlSiteTool,
+  emailFootprintTool,
+  harvestDomainTool,
 } from "./tools";
 
 export const TOOL_REGISTRY: Array<AgentTool<unknown, unknown>> = [
@@ -29,4 +32,7 @@ export const TOOL_REGISTRY: Array<AgentTool<unknown, unknown>> = [
   captureWebsiteTool as unknown as AgentTool<unknown, unknown>,
   extractExifTool as unknown as AgentTool<unknown, unknown>,
   checkCrossCaseMatchesTool as unknown as AgentTool<unknown, unknown>,
+  crawlSiteTool as unknown as AgentTool<unknown, unknown>,
+  emailFootprintTool as unknown as AgentTool<unknown, unknown>,
+  harvestDomainTool as unknown as AgentTool<unknown, unknown>,
 ];

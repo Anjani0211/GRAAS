@@ -4,13 +4,15 @@ import type { AgentTool } from "../toolRegistry";
 import { EvidenceHash } from "../../models/EvidenceHash";
 import { storageService } from "../../services/storageService";
 import { extractExifTags } from "../../utils/exifArtifact";
+import { extractPdfInfo } from "../../utils/pdfMeta";
+import { isPdfFile } from "../../services/pdfTextService";
 
 export const extractExifTool: AgentTool<{ evidenceId: string }, Record<string, unknown>> = {
   name: "extract_exif",
   description:
-    "Extract EXIF metadata from an image evidence file (GPS, device model, timestamps). Use when image evidence exists and metadata could reveal origin.",
+    "Extract metadata from image or PDF evidence. Images yield EXIF (GPS, device, timestamps). PDFs yield Info fields (author, creator, timestamps). Local file only, no network.",
   inputSchema: z.object({
-    evidenceId: z.string().min(1).describe("Evidence ID of an image file"),
+    evidenceId: z.string().min(1).describe("Evidence ID of an image or PDF file"),
   }),
   execute: async (input, ctx) => {
     const ev = await EvidenceHash.findOne({
@@ -26,6 +28,26 @@ export const extractExifTool: AgentTool<{ evidenceId: string }, Record<string, u
         data: { evidenceId: input.evidenceId, caseId: ctx.caseId },
       };
     }
+    const bytes = await storageService.readEvidence(ev.minioPath);
+    if (isPdfFile(ev.fileName, ev.mimeType)) {
+      const info = extractPdfInfo(bytes);
+      const keys = Object.keys(info);
+      return {
+        success: true,
+        rawText: keys.length
+          ? `Extracted ${keys.length} PDF info fields from ${ev.fileName}.`
+          : `No PDF info dictionary found in ${ev.fileName}.`,
+        confidence: keys.length ? ConfidenceScore.MEDIUM : ConfidenceScore.LOW,
+        data: {
+          evidenceId: input.evidenceId,
+          fileName: ev.fileName,
+          mimeType: ev.mimeType,
+          kind: "pdf",
+          hasGps: false,
+          pdfInfo: info,
+        },
+      };
+    }
     if (!ev.mimeType.startsWith("image/") && !/\.(jpg|jpeg|tif|tiff|heic)$/i.test(ev.fileName)) {
       return {
         success: false,
@@ -35,7 +57,6 @@ export const extractExifTool: AgentTool<{ evidenceId: string }, Record<string, u
         data: { evidenceId: input.evidenceId, fileName: ev.fileName, mimeType: ev.mimeType },
       };
     }
-    const bytes = await storageService.readEvidence(ev.minioPath);
     const exif = extractExifTags(bytes);
     if (!exif) {
       return {

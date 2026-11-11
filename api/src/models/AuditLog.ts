@@ -21,7 +21,8 @@ export type AuditAction =
   | "ERASURE_RESOLVED"
   | "SUPPORT_BOOKING_CREATED"
   | "CASE_ASSIGNED"
-  | "SETTINGS_UPDATED";
+  | "SETTINGS_UPDATED"
+  | "ESCALATION_DRAFT";
 
 export interface IAuditLog extends Document {
   userId: string;
@@ -61,6 +62,7 @@ const AuditLogSchema = new Schema<IAuditLog>(
         "SUPPORT_BOOKING_CREATED",
         "CASE_ASSIGNED",
         "SETTINGS_UPDATED",
+        "ESCALATION_DRAFT",
       ],
     },
     resourceId: { type: String, index: true },

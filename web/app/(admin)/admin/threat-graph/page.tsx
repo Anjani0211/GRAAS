@@ -41,6 +41,7 @@ const ENTITY_TYPES: { id: OsintEntityType; label: string; tone: string }[] = [
   { id: "ipv4",     label: "IPv4",     tone: "bg-slate-200 text-slate-800 border-slate-300" },
   { id: "wallet",   label: "Wallet",   tone: "bg-orange-100 text-orange-800 border-orange-300" },
   { id: "telegram", label: "Telegram", tone: "bg-cyan-100 text-cyan-800 border-cyan-300" },
+  { id: "username", label: "Username", tone: "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-300" },
 ];
 
 const CONFIDENCE_OPTIONS: OsintConfidence[] = ["UNVERIFIED", "LOW", "MEDIUM", "HIGH", "VERIFIED"];
@@ -55,6 +56,7 @@ const NODE_COLORS: Record<string, string> = {
   ipv4:     "#64748b",
   wallet:   "#f97316",
   telegram: "#06b6d4",
+  username: "#d946ef",
 };
 
 function colorForNode(n: ThreatGraphNode): string {

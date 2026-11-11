@@ -26,7 +26,7 @@ import {
 } from "@/lib/queries";
 import { API_BASE, osintApi, downloadReport, SENIOR_ANALYST_ROLE_LIST, type GrassReportDownloadFormat } from "@/lib/api";
 import type { GraphNode, ClusterAlertType } from "@/lib/types";
-import { simulateOcrFromFileName } from "@/lib/osint-utils";
+import { describeEnrichment, simulateOcrFromFileName } from "@/lib/osint-utils";
 import { categoryConfig, statusConfig, cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/store";
 import { resolveRefreshedScreenshotHref, screenshotHref } from "@/lib/screenshot-links";
@@ -72,6 +72,7 @@ import {
   Globe,
   Wallet,
   MessageSquare,
+  UserRound,
   BadgeCheck,
   Eye,
   Download,
@@ -151,6 +152,7 @@ const ENTITY_META: Record<OsintEntityType, { label: string; icon: typeof PhoneIc
   ipv4: { label: "IPv4", icon: Network },
   wallet: { label: "Crypto wallet", icon: Wallet },
   telegram: { label: "Telegram", icon: MessageSquare },
+  username: { label: "Username", icon: UserRound },
 };
 
 const TOOL_OPTIONS: Array<{ kind: OsintToolKind; label: string; placeholder: string; icon: typeof Globe }> = [
@@ -567,13 +569,23 @@ export default function OsintCaseWorkspacePage() {
     }
   }, [pipelineStatus, inv, inv?.lastRunStatus, caseId, qc]);
 
+  const [lastToolNote, setLastToolNote] = useState<string | null>(null);
+
   const onAddTool = useCallback(() => {
     if (!toolQuery.trim()) return;
+    setLastToolNote(null);
     runTool.mutate(
       { caseId, kind: toolKind, query: toolQuery.trim(), attach: toolAttach },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
           setToolQuery("");
+          if (data.provider === "mock" || (data.tool?.result as { mock?: boolean } | undefined)?.mock) {
+            setLastToolNote(
+              "Demo/mock result — API key missing. Do not treat this as live OSINT; clear before finalizing reports.",
+            );
+          } else {
+            setLastToolNote(`Live provider: ${data.provider}`);
+          }
         },
       },
     );
@@ -604,10 +616,6 @@ export default function OsintCaseWorkspacePage() {
     }, 250);
   }, [inv?.reportMarkdown, draftText, inv?.reportJson]);
 
-  const enrichmentByEntity = useMemo(
-    () => new Map((inv?.enrichments ?? []).map((r) => [r.entityId, r])),
-    [inv?.enrichments],
-  );
 
   if (isLoading || !caseData || !inv) {
     return (
@@ -902,21 +910,15 @@ export default function OsintCaseWorkspacePage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {inv.entities.map((e) => {
-                        const r = enrichmentByEntity.get(e.id);
-                        const Meta = ENTITY_META[e.type];
-                        const c = r?.confidence ?? "UNVERIFIED";
+                      {(inv.enrichments ?? []).map((r) => {
+                        const described = describeEnrichment(r.source, r.details);
+                        const c = r.confidence ?? "UNVERIFIED";
                         const meta = CONFIDENCE_META[c];
                         return (
-                          <tr key={e.id} className="border-t border-border/70">
-                            <td className="px-3 py-2">
-                              <span className="inline-flex items-center gap-1.5 text-xs">
-                                <Meta.icon className="size-3.5 text-muted-foreground" />
-                                {Meta.label}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 font-mono text-xs break-all">{e.value}</td>
-                            <td className="px-3 py-2 text-xs text-muted-foreground">{r?.source ?? "—"}</td>
+                          <tr key={r.entityId} className="border-t border-border/70">
+                            <td className="px-3 py-2 text-xs">{described.label}</td>
+                            <td className="px-3 py-2 font-mono text-xs break-all">{described.summary}</td>
+                            <td className="px-3 py-2 text-xs text-muted-foreground">{r.source}</td>
                             <td className="px-3 py-2">
                               <span
                                 className={cn(
@@ -1036,6 +1038,15 @@ export default function OsintCaseWorkspacePage() {
                 {runTool.isError && (
                   <p className="text-xs text-red-600">
                     {runTool.error instanceof Error ? runTool.error.message : "Tool failed"}
+                  </p>
+                )}
+                {lastToolNote && (
+                  <p
+                    className={`text-xs ${
+                      lastToolNote.startsWith("Demo") ? "text-amber-700" : "text-emerald-700"
+                    }`}
+                  >
+                    {lastToolNote}
                   </p>
                 )}
 
@@ -1663,7 +1674,7 @@ function EmptyStage({ label }: { label: string }) {
 }
 
 function EntityCard({ entity, flaggedInvalid }: { entity: OsintEntity; flaggedInvalid?: boolean }) {
-  const Meta = ENTITY_META[entity.type];
+  const Meta = ENTITY_META[entity.type] ?? { label: entity.type, icon: Hash };
   const isInvalid = flaggedInvalid || !entity.valid;
   return (
     <div
@@ -1743,6 +1754,11 @@ function ToolResultRow({
           <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             {tool.kind}
           </span>
+          {(tool.result as { mock?: boolean } | null)?.mock && (
+            <span className="ml-1 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+              Demo / mock
+            </span>
+          )}
           <span className="ml-2 break-all font-mono text-xs">{tool.query}</span>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
             {new Date(tool.runAt).toLocaleString("en-IN")}
@@ -1848,14 +1864,24 @@ function EvidenceRow({
             type="button"
             variant="outline"
             size="sm"
+            title="Dev only — inserts placeholder text, not real OCR"
             onClick={() => {
-              const t = ocr || simulateOcrFromFileName(ev.fileName);
+              if (
+                !window.confirm(
+                  "Insert PLACEHOLDER OCR text? This is not real extraction and can contaminate the evidence trail. Prefer real vision OCR or paste verified text.",
+                )
+              ) {
+                return;
+              }
+              const t =
+                ocr ||
+                `[PLACEHOLDER OCR — NOT EXTRACTED]\nFile: ${ev.fileName}\n${simulateOcrFromFileName(ev.fileName)}`;
               setOcr(t);
               patchEv.mutate({ caseId, evidenceId: ev.id, ocrText: t });
             }}
           >
             <Sparkles className="size-3.5 mr-1" />
-            Simulate OCR
+            Placeholder OCR
           </Button>
           <Button
             type="button"

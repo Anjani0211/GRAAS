@@ -11,16 +11,26 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { collapsed } = useSidebarStore();
+  const { collapsed, mobileOpen, setMobileOpen } = useSidebarStore();
 
   return (
     <AuthGuard allowedRoles={[...STAFF_ROLES]}>
       <div className="min-h-screen bg-background">
+        {/* Mobile backdrop */}
+        {mobileOpen && (
+          <button
+            type="button"
+            aria-label="Close navigation"
+            className="fixed inset-0 z-40 bg-black/40 md:hidden"
+            onClick={() => setMobileOpen(false)}
+          />
+        )}
         <AdminSidebar />
         <main
           className={cn(
             "min-h-screen transition-all duration-200",
-            collapsed ? "ml-16" : "ml-64"
+            "ml-0",
+            collapsed ? "md:ml-16" : "md:ml-64",
           )}
         >
           {children}

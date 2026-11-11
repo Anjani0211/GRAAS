@@ -138,7 +138,8 @@ export async function autoDraftDispatchPlan(
                 | "email"
                 | "wallet"
                 | "telegram"
-                | "domain");
+                | "domain"
+                | "username");
         return {
           value: e.value,
           type: typeOut,

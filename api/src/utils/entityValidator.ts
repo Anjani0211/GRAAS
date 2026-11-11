@@ -47,6 +47,8 @@ export function isValid(type: OsintEntityType, value: string): boolean {
     case "domain":
       // Domains must be non-empty, have a TLD, and be lowercase
       return /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/.test(value);
+    case "username":
+      return /^[A-Za-z][A-Za-z0-9_.-]{2,31}$/.test(value);
     default:
       return false;
   }

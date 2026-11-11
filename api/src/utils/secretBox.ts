@@ -1,15 +1,33 @@
 import crypto from "crypto";
 import { config } from "../config";
+import { logger } from "./logger";
 
 const ALGO = "aes-256-gcm";
 const IV_LEN = 12;
 const TAG_LEN = 16;
 
+let warnedWeakKey = false;
+
 function deriveKey(): Buffer {
-  const material =
-    process.env.SETTINGS_ENCRYPTION_KEY ||
-    config.jwtSecret ||
-    "graas-dev-settings-key";
+  const dedicated = process.env.SETTINGS_ENCRYPTION_KEY?.trim();
+  const material = dedicated || config.jwtSecret;
+  if (!material) {
+    throw new Error(
+      "SETTINGS_ENCRYPTION_KEY or JWT_SECRET is required to encrypt platform settings",
+    );
+  }
+  if (!dedicated && config.nodeEnv === "production" && !warnedWeakKey) {
+    warnedWeakKey = true;
+    logger.warn(
+      "[Settings] SETTINGS_ENCRYPTION_KEY unset — deriving from JWT_SECRET. Set a dedicated key so JWT rotation does not brick stored secrets.",
+    );
+  }
+  if (!dedicated && config.nodeEnv !== "production" && !warnedWeakKey) {
+    warnedWeakKey = true;
+    logger.warn(
+      "[Settings] Using JWT_SECRET to encrypt settings in development. Prefer SETTINGS_ENCRYPTION_KEY.",
+    );
+  }
   return crypto.scryptSync(material, "graas-platform-settings-v1", 32);
 }
 

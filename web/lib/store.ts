@@ -4,14 +4,20 @@ import { authApi } from "./api";
 
 interface SidebarStore {
   collapsed: boolean;
+  mobileOpen: boolean;
   toggle: () => void;
   setCollapsed: (collapsed: boolean) => void;
+  setMobileOpen: (open: boolean) => void;
+  toggleMobile: () => void;
 }
 
 export const useSidebarStore = create<SidebarStore>((set) => ({
   collapsed: false,
+  mobileOpen: false,
   toggle: () => set((s) => ({ collapsed: !s.collapsed })),
   setCollapsed: (collapsed) => set({ collapsed }),
+  setMobileOpen: (mobileOpen) => set({ mobileOpen }),
+  toggleMobile: () => set((s) => ({ mobileOpen: !s.mobileOpen })),
 }));
 
 interface SubmissionStore {

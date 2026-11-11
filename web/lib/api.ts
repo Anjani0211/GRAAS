@@ -601,10 +601,14 @@ export type NotificationFeedItem = {
 
 export const notificationsApi = {
   send(data: { caseId: string; channel: "sms" | "email" | "whatsapp"; recipient: string; message: string }) {
-    return apiFetch<{ status: string; channel: string; recipient: string; notificationId: string }>(
-      "/notifications/send",
-      { method: "POST", body: JSON.stringify(data) },
-    );
+    return apiFetch<{
+      status: string;
+      channel: string;
+      recipient: string;
+      notificationId: string;
+      note?: string;
+      delivery?: { ok: boolean; provider?: string; reason?: string };
+    }>("/notifications/send", { method: "POST", body: JSON.stringify(data) });
   },
 
   history(caseId: string) {
@@ -628,6 +632,21 @@ export const authApi = {
 
   register(data: { name: string; email: string; password: string; phone?: string; role?: string }) {
     return apiFetch<AuthResponse>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  /** Admin-only staff create — does not switch the current session cookie. */
+  createStaff(data: {
+    name: string;
+    email: string;
+    password: string;
+    phone?: string;
+    badgeId?: string;
+    role: string;
+  }) {
+    return apiFetch<{ user: User }>("/auth/register", {
       method: "POST",
       body: JSON.stringify(data),
     });

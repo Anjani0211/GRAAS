@@ -53,6 +53,9 @@ export default function VictimSupportPage() {
         <p className="mt-2 max-w-2xl text-muted-foreground">
           Request legal or counselling support. Bookings are logged for GRAAS coordinators to confirm.
         </p>
+        <p className="mt-2 max-w-2xl rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200/80">
+          Partner directory is a sample seed for demos — coordinators must verify real providers before referrals.
+        </p>
         {message && (
           <p className="mt-3 text-sm text-muted-foreground" role="status">
             {message}

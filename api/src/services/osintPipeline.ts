@@ -105,6 +105,8 @@ const IPV4_RE = /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|[
 const ETH_RE = /\b0x[a-fA-F0-9]{40}\b/g;
 const BTC_RE = /\b(?:bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}\b/g;
 const TELEGRAM_RE = /(?<![a-zA-Z0-9])@[A-Za-z0-9_]{5,32}\b/g;
+const USERNAME_LABEL_RE = /\b(?:username|user\s*name|handle|alias)\s*[:=]\s*@?([A-Za-z][A-Za-z0-9_.-]{2,31})\b/gi;
+const USERNAME_SKIP = new Set(["admin", "user", "test", "null", "undefined", "http", "https", "www"]);
 const IFSC_RE = /\b[A-Z]{4}0[A-Z0-9]{6}\b/g;
 
 const PHONE_VALID = /^(?:\+91|0)?[6-9]\d{9}$/;
@@ -180,6 +182,11 @@ export function extractEntitiesFromCorpus(
     (text.match(ETH_RE) ?? []).forEach((v) => push("wallet", v, sourceFile, true));
     (text.match(BTC_RE) ?? []).forEach((v) => push("wallet", v, sourceFile, true));
     (text.match(TELEGRAM_RE) ?? []).forEach((v) => push("telegram", v, sourceFile, true));
+    for (const match of text.matchAll(new RegExp(USERNAME_LABEL_RE.source, "gi"))) {
+      const handle = match[1];
+      if (!handle || USERNAME_SKIP.has(handle.toLowerCase())) continue;
+      push("username", handle, sourceFile, true);
+    }
     // IFSC codes often appear in UPI settlement trails — route through UPI enrichment (bank lookup).
     (text.match(IFSC_RE) ?? []).forEach((v) => {
       const pseudo = `${v.toLowerCase()}@ifsc`;
@@ -448,6 +455,7 @@ const ENTITY_LABEL: Record<OsintEntityType, string> = {
   ipv4: "IPv4",
   wallet: "Crypto wallet",
   telegram: "Telegram handle",
+  username: "Username",
 };
 
 function shortHash(h: string): string {
@@ -697,6 +705,7 @@ function mapAgentTypeToOsintType(type: string): OsintEntityType | null {
     case "ipv4":
     case "wallet":
     case "telegram":
+    case "username":
       return type;
     default:
       return null;

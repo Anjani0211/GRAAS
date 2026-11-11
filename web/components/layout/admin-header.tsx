@@ -3,14 +3,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, ArrowRight, Loader2 } from "lucide-react";
+import { Search, ArrowRight, Loader2, Menu, LogOut, Settings, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AdminNotificationBell } from "@/components/layout/admin-notification-bell";
 import { CaseStatusBadge, SeverityBadge } from "@/components/case/case-status-badge";
-import { useAuthStore } from "@/lib/store";
+import { useAuthStore, useSidebarStore } from "@/lib/store";
 import { useCases } from "@/lib/queries";
+import { isAdminRole } from "@/lib/roles";
+import { cn } from "@/lib/utils";
 
 function userInitials(name?: string | null, email?: string | null): string {
   const base = (name || email || "?").trim();
@@ -23,11 +25,14 @@ function userInitials(name?: string | null, email?: string | null): string {
 
 export function AdminHeader({ title }: { title: string }) {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, logout } = useAuthStore();
+  const { toggleMobile } = useSidebarStore();
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [open, setOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebounced(query.trim()), 220);
@@ -44,6 +49,7 @@ export function AdminHeader({ title }: { title: string }) {
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
       if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
     }
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
@@ -64,7 +70,17 @@ export function AdminHeader({ title }: { title: string }) {
 
   return (
     <header className="sticky top-0 z-30 border-b border-black/[0.06] bg-card/85 backdrop-blur-md">
-      <div className="flex w-full min-h-[5rem] items-center gap-3 px-6 py-3 sm:gap-5 sm:px-8 sm:py-3.5">
+      <div className="flex w-full min-h-[5rem] items-center gap-3 px-4 py-3 sm:gap-5 sm:px-8 sm:py-3.5">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="shrink-0 md:hidden"
+          aria-label="Open navigation"
+          onClick={toggleMobile}
+        >
+          <Menu className="size-5" />
+        </Button>
         <div className="min-w-0 shrink-0">
           <p className="font-mono-technical text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
             Operations
@@ -155,18 +171,62 @@ export function AdminHeader({ title }: { title: string }) {
             <Search className="size-5" />
           </Button>
           <AdminNotificationBell />
-          <div
-            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground"
-            title={user?.name || user?.email || "Operator"}
-            aria-label={user?.name ? `Signed in as ${user.name}` : "Operator"}
-          >
-            {initials}
+          <div className="relative" ref={menuRef}>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              className="flex items-center gap-2 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={user?.name ? `Account menu for ${user.name}` : "Account menu"}
+              aria-expanded={menuOpen}
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                {initials}
+              </span>
+              {user?.role && (
+                <Badge variant="secondary" className="hidden font-mono-technical text-[10px] uppercase lg:inline-flex">
+                  {user.role.replace(/_/g, " ")}
+                </Badge>
+              )}
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-56 overflow-hidden rounded-xl border border-black/[0.08] bg-card py-1 shadow-lg">
+                <div className="border-b border-black/[0.06] px-3 py-2">
+                  <p className="truncate text-sm font-medium">{user?.name || "Operator"}</p>
+                  <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+                </div>
+                {isAdminRole(user?.role) && (
+                  <>
+                    <Link
+                      href="/admin/team"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted"
+                    >
+                      <Users className="size-4" /> Team
+                    </Link>
+                    <Link
+                      href="/admin/settings"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted"
+                    >
+                      <Settings className="size-4" /> Settings
+                    </Link>
+                  </>
+                )}
+                <button
+                  type="button"
+                  className={cn(
+                    "flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-muted",
+                  )}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void logout().then(() => router.push("/login"));
+                  }}
+                >
+                  <LogOut className="size-4" /> Sign out
+                </button>
+              </div>
+            )}
           </div>
-          {user?.role && (
-            <Badge variant="secondary" className="hidden font-mono-technical text-[10px] uppercase lg:inline-flex">
-              {user.role.replace(/_/g, " ")}
-            </Badge>
-          )}
         </div>
       </div>
     </header>

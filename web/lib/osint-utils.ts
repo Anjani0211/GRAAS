@@ -13,6 +13,71 @@ function uniq<T>(arr: T[]): T[] {
   return [...new Set(arr)];
 }
 
+function detailStrings(details: Record<string, unknown>, key: string): string[] {
+  const raw = details[key];
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((item): item is string => typeof item === "string");
+}
+
+const TOOL_LABELS: Record<string, string> = {
+  crawl_site: "Site crawl",
+  harvest_domain: "Domain harvest",
+  email_footprint: "Email footprint",
+  search_username: "Username",
+  scan_url: "URL scan",
+  whois_domain: "WHOIS",
+  check_email_breach: "Email breach",
+  lookup_phone: "Phone",
+  lookup_upi: "UPI",
+  lookup_ip: "IP",
+  lookup_telegram_id: "Telegram",
+  trace_crypto_wallet: "Wallet",
+};
+
+/** One-line hit summary for an OSINT tool result shown on the case page. */
+export function describeEnrichment(
+  source: string,
+  details: Record<string, unknown> | undefined,
+): { label: string; summary: string } {
+  const d = details ?? {};
+  const label = TOOL_LABELS[source] ?? source;
+  if (source === "crawl_site") {
+    const emails = detailStrings(d, "emails");
+    const social = detailStrings(d, "socialLinks");
+    const extra = [...emails, ...social].slice(0, 3).join(", ");
+    return {
+      label,
+      summary: `${String(d.seedHost ?? d.seedUrl ?? "site")}: ${emails.length} emails, ${social.length} social, ${detailStrings(d, "files").length} files${extra ? ` (${extra})` : ""}`,
+    };
+  }
+  if (source === "harvest_domain") {
+    const hosts = detailStrings(d, "certificateHosts");
+    return {
+      label,
+      summary: `${String(d.domain ?? "domain")}: ${hosts.length} cert hosts, ${detailStrings(d, "emails").length} emails${hosts.length ? ` (${hosts.slice(0, 3).join(", ")})` : ""}`,
+    };
+  }
+  if (source === "email_footprint") {
+    const profiles = detailStrings(d, "likelyProfiles");
+    const gravatar = d.hasGravatar === true ? "yes" : d.hasGravatar === false ? "no" : "unknown";
+    return {
+      label,
+      summary: `gravatar ${gravatar}, ${profiles.length} public profiles${profiles.length ? ` (${profiles.slice(0, 3).join(", ")})` : ""}`,
+    };
+  }
+  if (source === "search_username") {
+    const profiles = detailStrings(d, "likelyProfiles");
+    return {
+      label,
+      summary: `${String(d.username ?? "handle")}: ${profiles.length} profiles${profiles.length ? ` (${profiles.slice(0, 3).join(", ")})` : ""}`,
+    };
+  }
+  const direct = ["phone", "upi", "ip", "url", "domain", "email", "wallet", "telegramId", "username"].find(
+    (key) => typeof d[key] === "string",
+  );
+  return { label, summary: direct ? String(d[direct]) : label };
+}
+
 export function extractIocFromText(text: string): {
   ipv4: string[];
   ipv6: string[];

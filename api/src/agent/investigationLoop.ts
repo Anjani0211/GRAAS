@@ -323,17 +323,62 @@ export async function runInvestigationLoop(
       at: new Date().toISOString(),
     });
 
-    const response = await model.invoke(messages, { timeout: config.agentIterationTimeoutMs });
-    messages.push({ role: "assistant", content: String((response as unknown as { content?: unknown }).content ?? "") });
+    let response: unknown;
+    try {
+      response = await model.invoke(messages, { timeout: config.agentIterationTimeoutMs });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      memory.exitReason = "TIMEOUT";
+      memory.exitStatement = `Stopped after ${memory.totalToolCalls} tool calls: ${message.slice(0, 400)}`;
+      memory.completedAt = new Date();
+      logger.warn({ err, caseId, runId, toolCalls: memory.totalToolCalls }, "[Agent] Model call failed");
+      break;
+    }
+    const assistantText = String((response as unknown as { content?: unknown }).content ?? "");
+    messages.push({ role: "assistant", content: assistantText });
 
-    // If model did not call any tools, treat it as a natural completion.
-    const toolCalls = (response as unknown as { tool_calls?: unknown[] }).tool_calls;
-    if (!toolCalls || toolCalls.length === 0) {
+    // model.invoke does not run tools by itself. Dispatch each call into the
+    // registered tool so the callback records the result on the case.
+    const toolCalls = (response as unknown as { tool_calls?: unknown[] }).tool_calls ?? [];
+    if (toolCalls.length === 0) {
       memory.exitReason = "COMPLETE";
-      memory.exitStatement = String((response as unknown as { content?: unknown }).content ?? "");
+      memory.exitStatement = assistantText;
       memory.completedAt = new Date();
       break;
     }
+
+    const runnable = [...lcTools, completeTool];
+    const resultLines: string[] = [];
+    for (const call of toolCalls) {
+      const rec = call as { name?: string; args?: unknown; id?: string };
+      const name = rec.name ?? "";
+      const lc = runnable.find((item) => item.name === name);
+      let args: unknown = rec.args ?? {};
+      if (typeof args === "string") {
+        try {
+          args = JSON.parse(args);
+        } catch {
+          args = {};
+        }
+      }
+      if (!lc) {
+        resultLines.push(`${name || "unknown"}: tool is not available.`);
+        continue;
+      }
+      try {
+        const output = await lc.invoke(args as never);
+        resultLines.push(`${name}: ${String(output).slice(0, 2000)}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        resultLines.push(`${name}: failed (${message.slice(0, 300)})`);
+        logger.warn({ err, toolName: name, caseId }, "[Agent] Tool invocation failed");
+      }
+    }
+    if (memory.exitReason !== "ERROR") break;
+    messages.push({
+      role: "user",
+      content: `Tool results:\n${resultLines.join("\n")}`,
+    });
   }
 
   if (iteration >= maxIter && memory.exitReason === "ERROR") {

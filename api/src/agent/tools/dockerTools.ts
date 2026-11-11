@@ -2,7 +2,7 @@ import { z } from "zod";
 import net from "net";
 import puppeteer, { type Browser } from "puppeteer";
 import { EvidenceHash } from "../../models/EvidenceHash";
-import { safeHttp } from "../../utils/httpClient";
+import { searchPublicProfiles } from "../../services/osint/public/usernameSearch";
 import { storageService } from "../../services/storageService";
 import { ConfidenceScore } from "../../types/confidence";
 import type { AgentTool } from "../toolRegistry";
@@ -126,7 +126,7 @@ function buildApkPreviewB64(evidenceId: string, counts: Record<string, number>):
 export const searchUsernameTool: AgentTool<{ username: string }, Record<string, unknown>> = {
   name: "search_username",
   description:
-    "Search a username/alias across many platforms to find profiles. Use when a suspect handle is found in evidence or returned by another tool. Prefer screenshots for documentation.",
+    "Search a username/alias on public profile pages (GitHub, Telegram, Reddit, developer sites, and others). No API key. Use when a handle is found in evidence. A hit requires HTTP 200 without that site's not-found marker.",
   inputSchema: z.object({
     username: z.string().min(1).describe("Username/alias to search without @"),
   }),
@@ -142,41 +142,15 @@ export const searchUsernameTool: AgentTool<{ username: string }, Record<string, 
       };
     }
 
-    const candidates = [
-      { platform: "Telegram", url: `https://t.me/${cleaned}` },
-      { platform: "GitHub", url: `https://github.com/${cleaned}` },
-      { platform: "Instagram", url: `https://instagram.com/${cleaned}` },
-      { platform: "X", url: `https://x.com/${cleaned}` },
-      { platform: "Facebook", url: `https://facebook.com/${cleaned}` },
-      { platform: "LinkedIn", url: `https://linkedin.com/in/${cleaned}` },
-    ];
-    const checks = await Promise.all(
-      candidates.map(async (c) => {
-        try {
-          const r = await safeHttp.get(c.url, {
-            timeout: 6000,
-            maxRedirects: 2,
-            validateStatus: (s) => s >= 200 && s < 500,
-          });
-          return {
-            ...c,
-            status: r.status,
-            likelyExists: r.status >= 200 && r.status < 400,
-          };
-        } catch {
-          return { ...c, status: null, likelyExists: false };
-        }
-      }),
-    );
-    const hits = checks.filter((c) => c.likelyExists);
+    const found = await searchPublicProfiles(cleaned);
     return {
       success: true,
-      rawText: `Username ${cleaned}: likely profiles=${hits.length}/${checks.length}.`,
-      confidence: hits.length >= 2 ? ConfidenceScore.MEDIUM : ConfidenceScore.LOW,
+      rawText: `Username ${cleaned}: likely profiles=${found.likelyProfiles.length}/${found.checks.length}.`,
+      confidence: found.likelyProfiles.length >= 2 ? ConfidenceScore.MEDIUM : ConfidenceScore.LOW,
       data: {
         username: cleaned,
-        checks,
-        likelyProfiles: hits.map((h) => h.url),
+        checks: found.checks,
+        likelyProfiles: found.likelyProfiles,
         telegramHandle: `@${cleaned}`,
       },
     };

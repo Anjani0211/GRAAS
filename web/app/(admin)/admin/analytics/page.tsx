@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import Link from "next/link";
 import { motion } from "framer-motion";
 import { AdminHeader } from "@/components/layout/admin-header";
 import { Button } from "@/components/ui/button";
 import { useCaseStats, useOsintQueue } from "@/lib/queries";
+import type { CaseStats } from "@/lib/types";
 import { categoryConfig } from "@/lib/utils";
 import { ChartTooltipCard } from "@/components/analytics/chart-tooltip";
 import {
@@ -14,9 +14,8 @@ import {
   CheckCircle2,
   Timer,
   FolderOpen,
-  Gavel,
+  AlertTriangle,
   Loader2,
-  Plus,
 } from "lucide-react";
 
 import {
@@ -45,6 +44,50 @@ const CHART_AXIS = "#434654";
 
 const bentoPanel =
   "rounded-xl border border-black/[0.08] bg-card p-6 shadow-[0_12px_40px_rgba(26,86,219,0.04)] sm:p-8";
+
+function formatDeltaBadge(
+  delta: number | undefined,
+  opts?: { invertGood?: boolean; suffix?: string },
+): { label: string; className: string } | null {
+  if (delta === undefined || Number.isNaN(delta)) return null;
+  if (delta === 0) return { label: "Flat vs last month", className: "bg-muted text-muted-foreground font-mono-technical" };
+  const up = delta > 0;
+  const abs = Math.abs(delta);
+  const num = Number.isInteger(abs) ? String(abs) : abs.toFixed(1);
+  const prefix = up ? "+" : "−";
+  const suffix = opts?.suffix ?? "";
+  const good = opts?.invertGood ? !up : up;
+  return {
+    label: `${prefix}${num}${suffix} vs last month`,
+    className: good
+      ? "bg-[#dbe1ff] text-[#003dab] font-mono-technical"
+      : "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300 font-mono-technical",
+  };
+}
+
+function downloadKpiCsv(stats: CaseStats): void {
+  const { kpis, pendingTriage, unassigned } = stats;
+  const resolutionPct =
+    kpis.totalThisMonth > 0 ? ((kpis.resolved / kpis.totalThisMonth) * 100).toFixed(1) : "";
+  const rows = [
+    ["metric", "value"],
+    ["total_this_month", String(kpis.totalThisMonth)],
+    ["resolved", String(kpis.resolved)],
+    ["resolution_rate_pct", resolutionPct],
+    ["avg_resolution_days", String(kpis.avgResolutionDays)],
+    ["high_severity", String(kpis.highSeverity)],
+    ["pending_triage", String(pendingTriage)],
+    ["unassigned", String(unassigned)],
+  ];
+  const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `analytics_kpi_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function AnalyticsPage() {
   const { data: stats, isLoading } = useCaseStats();
@@ -97,27 +140,20 @@ export default function AnalyticsPage() {
 
   const maxStateCases = stateData[0]?.cases ?? 1;
 
-  const resolutionBars = useMemo(() => {
-    const template = [
-      { label: "Identity theft", hours: 12.4, widthPct: 80 },
-      { label: "Financial fraud", hours: 8.2, widthPct: 55 },
-      { label: "Social engineering", hours: 6.1, widthPct: 40 },
-      { label: "Harassment", hours: 2.5, widthPct: 15 },
-    ];
+  const categoryVolumeBars = useMemo(() => {
     const top = categoryDistribution.slice(0, 4);
-    if (top.length === 0) return template;
-    return top.map((c, i) => ({
+    if (top.length === 0) return [];
+    const max = top[0]?.value ?? 1;
+    return top.map((c) => ({
       label: c.name,
-      hours: Number((template[i]?.hours ?? 4 + (4 - i) * 2).toFixed(1)),
-      widthPct: template[i]?.widthPct ?? 30 + (4 - i) * 15,
+      cases: c.value,
+      widthPct: Math.max(8, Math.round((c.value / max) * 100)),
     }));
   }, [categoryDistribution]);
 
   const kpis = useMemo(() => {
     if (!stats) return null;
-    const { totalThisMonth, resolved, avgResolutionDays, highSeverity } = stats.kpis;
-    const sevTotal =
-      stats.severityCounts.high + stats.severityCounts.medium + stats.severityCounts.low || 1;
+    const { totalThisMonth, resolved, avgResolutionDays, highSeverity, deltas } = stats.kpis;
     const resolutionPct =
       totalThisMonth > 0 ? Number(((resolved / totalThisMonth) * 100).toFixed(1)) : null;
     const triageDisplay =
@@ -127,97 +163,62 @@ export default function AnalyticsPage() {
           : `${Math.round(avgResolutionDays * 24)}h`
         : "—";
     const activeApprox = Math.max(0, totalThisMonth - resolved) + stats.pendingTriage;
-    const takedownPct =
-      resolutionPct != null
-        ? Math.min(99, Math.max(40, Math.round(resolutionPct * 0.93)))
-        : Math.min(99, Math.round((stats.severityCounts.low / sevTotal) * 100));
 
     return [
       {
         label: "Total resolution rate",
         value: resolutionPct != null ? `${resolutionPct}%` : "—",
-        badge: "+2.4%",
-        badgeClass: "bg-[#dbe1ff] text-[#003dab] font-mono-technical",
+        badge: formatDeltaBadge(deltas?.resolved),
         icon: CheckCircle2,
         iconWrap: "bg-primary/10 text-primary",
       },
       {
         label: "Avg. triage time",
         value: triageDisplay,
-        badge: "-18m",
-        badgeClass: "bg-[#eaddff] text-[#5a00c6] font-mono-technical",
+        badge: formatDeltaBadge(deltas?.avgResolutionDays, { invertGood: true, suffix: "d" }),
         icon: Timer,
         iconWrap: "bg-[#712ae2]/10 text-[#712ae2]",
       },
       {
         label: "Active cases",
         value: activeApprox > 0 ? activeApprox.toLocaleString("en-IN") : totalThisMonth.toLocaleString("en-IN"),
-        badge: "Live",
-        badgeClass: "bg-muted text-muted-foreground font-mono-technical",
+        badge: formatDeltaBadge(deltas?.totalThisMonth),
         icon: FolderOpen,
         iconWrap: "bg-[#004a88]/10 text-[#004a88]",
       },
       {
-        label: "Takedown success",
-        value: `${takedownPct}%`,
-        badge: "Target 90%",
-        badgeClass: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300 font-mono-technical",
-        icon: Gavel,
+        label: "High severity",
+        value: highSeverity.toLocaleString("en-IN"),
+        badge: formatDeltaBadge(deltas?.highSeverity, { invertGood: true }),
+        icon: AlertTriangle,
         iconWrap: "bg-destructive/10 text-destructive",
       },
     ];
   }, [stats]);
 
   const takedownRows = useMemo(() => {
-    if (osintQueue && osintQueue.length > 0) {
-      return osintQueue.slice(0, 5).map((row) => {
-        const loc = [row.district, row.state].filter(Boolean).join(", ") || "—";
-        const statusUpper = row.status.replace(/_/g, " ").toUpperCase();
-        const tone =
-          row.status === "osint" ? ("progress" as const)
-          : row.status === "triaged" || row.status === "submitted" ? ("queued" as const)
-          : ("verified" as const);
-        return {
-          id: row.caseNumber,
-          domain: loc,
-          type: categoryConfig[row.category]?.label ?? row.category,
-          status: statusUpper,
-          statusTone: tone,
-          tat: formatRelativeHours(row.updatedAt),
-        };
-      });
-    }
-    return [
-      {
-        id: "#GR-8892",
-        domain: "secure-login-v4.net/api/node",
-        type: "Financial phishing",
-        status: "IN_PROGRESS",
-        statusTone: "progress" as const,
-        tat: "0.8h",
-      },
-      {
-        id: "#GR-8895",
-        domain: "fast-loans-instant.in",
-        type: "Loan app fraud",
-        status: "VERIFIED",
-        statusTone: "verified" as const,
-        tat: "1.2h",
-      },
-      {
-        id: "#GR-8901",
-        domain: "pancard-update-link.org",
-        type: "Identity theft",
-        status: "QUEUED",
-        statusTone: "queued" as const,
-        tat: "2.5h",
-      },
-    ];
+    if (!osintQueue?.length) return [];
+    return osintQueue.slice(0, 5).map((row) => {
+      const loc = [row.district, row.state].filter(Boolean).join(", ") || "—";
+      const statusUpper = row.status.replace(/_/g, " ").toUpperCase();
+      const tone =
+        row.status === "osint" ? ("progress" as const)
+        : row.status === "triaged" || row.status === "submitted" ? ("queued" as const)
+        : ("verified" as const);
+      return {
+        id: row.caseNumber,
+        domain: loc,
+        type: categoryConfig[row.category]?.label ?? row.category,
+        status: statusUpper,
+        statusTone: tone,
+        tat: formatRelativeHours(row.updatedAt),
+      };
+    });
   }, [osintQueue]);
 
   const highPriorityCount = useMemo(() => {
-    if (!osintQueue?.length) return 4;
-    return osintQueue.filter((r) => r.severity === "high").length || 1;
+    if (!osintQueue?.length) return 0;
+    return osintQueue.filter((r) => r.severity === "high").length;
   }, [osintQueue]);
 
   if (isLoading || !stats) {
@@ -234,27 +235,24 @@ export default function AnalyticsPage() {
   return (
     <>
       <AdminHeader title="Analytics" />
-      <div className="mx-auto max-w-7xl px-6 pb-24 pt-4 sm:px-8">
+      <div className="mx-auto max-w-7xl px-6 pb-12 pt-4 sm:px-8">
         <header className="mb-10 flex flex-col gap-6 sm:mb-12 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Analytics overview</h1>
             <p className="mt-1 text-muted-foreground">Real-time redressal metrics across all operational nodes.</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Button
-              variant="outline"
-              className="h-10 rounded-xl border-black/[0.08] bg-muted/50 font-medium shadow-none hover:bg-muted"
-            >
-              <Calendar className="size-4" />
+            <span className="inline-flex h-10 items-center gap-2 rounded-xl border border-black/[0.08] bg-muted/50 px-4 text-sm font-medium text-muted-foreground">
+              <Calendar className="size-4" aria-hidden />
               Last 30 days
-            </Button>
+            </span>
             <Button
               variant="cta"
               className="h-10 rounded-xl shadow-lg shadow-primary/20 transition-transform hover:scale-[1.02]"
-              onClick={() => window.print()}
+              onClick={() => downloadKpiCsv(stats)}
             >
               <Download className="size-4" />
-              Export PDF
+              Export KPI CSV
             </Button>
           </div>
         </header>
@@ -272,7 +270,11 @@ export default function AnalyticsPage() {
                 <div className={`flex size-10 items-center justify-center rounded-full ${kpi.iconWrap}`}>
                   <kpi.icon className="size-5" aria-hidden />
                 </div>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${kpi.badgeClass}`}>{kpi.badge}</span>
+                {kpi.badge ? (
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${kpi.badge.className}`}>
+                    {kpi.badge.label}
+                  </span>
+                ) : null}
               </div>
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{kpi.label}</p>
               <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight">{kpi.value}</p>
@@ -441,22 +443,28 @@ export default function AnalyticsPage() {
 
           {/* Resolution bars — 6 cols */}
           <div className={`col-span-12 lg:col-span-6 ${bentoPanel}`}>
-            <h3 className="mb-8 text-lg font-semibold tracking-tight">Resolution time (avg. hrs)</h3>
+            <h3 className="mb-8 text-lg font-semibold tracking-tight">Cases by category (top 4)</h3>
             <div className="space-y-6">
-              {resolutionBars.map((row) => (
-                <div key={row.label}>
-                  <div className="mb-2 flex justify-between">
-                    <span className="text-xs font-medium">{row.label}</span>
-                    <span className="font-mono-technical text-xs font-bold text-primary">{row.hours} hrs</span>
+              {categoryVolumeBars.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No category data yet</p>
+              ) : (
+                categoryVolumeBars.map((row) => (
+                  <div key={row.label}>
+                    <div className="mb-2 flex justify-between">
+                      <span className="text-xs font-medium">{row.label}</span>
+                      <span className="font-mono-technical text-xs font-bold text-primary">
+                        {row.cases} cases
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all duration-500"
+                        style={{ width: `${row.widthPct}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all duration-500"
-                      style={{ width: `${row.widthPct}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
@@ -494,13 +502,19 @@ export default function AnalyticsPage() {
         <div className={`mt-12 overflow-hidden ${bentoPanel} p-0`}>
           <div className="flex flex-col gap-3 border-b border-black/[0.08] px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
             <h3 className="text-lg font-semibold tracking-tight">Active takedown queue</h3>
-            <span className="font-mono-technical w-fit rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-800 dark:bg-red-950/60 dark:text-red-200">
-              {highPriorityCount} high priority
-            </span>
+            {highPriorityCount > 0 ? (
+              <span className="font-mono-technical w-fit rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-800 dark:bg-red-950/60 dark:text-red-200">
+                {highPriorityCount} high priority
+              </span>
+            ) : null}
           </div>
           {queueLoading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="size-6 animate-spin text-primary" />
+            </div>
+          ) : takedownRows.length === 0 ? (
+            <div className="px-6 py-14 text-center text-sm text-muted-foreground sm:px-8">
+              No cases in the OSINT takedown queue right now.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -542,17 +556,6 @@ export default function AnalyticsPage() {
           )}
         </div>
       </div>
-
-      <Link
-        href="/admin/osint"
-        className="group fixed bottom-8 right-8 z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-2xl transition-transform hover:scale-110 active:scale-95 print:hidden"
-        aria-label="New investigation"
-      >
-        <Plus className="size-7" />
-        <span className="pointer-events-none absolute right-16 whitespace-nowrap rounded-lg bg-foreground px-4 py-2 text-xs font-bold text-background opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-          New investigation
-        </span>
-      </Link>
     </>
   );
 }

@@ -35,7 +35,6 @@ import {
   Shield,
   Send,
   Download,
-  ExternalLink,
   Banknote,
   AlertTriangle,
   MessageSquare,
@@ -108,6 +107,7 @@ export default function CaseDetailPage() {
   const sendNotification = useSendNotification();
   const postMessage = usePostCaseMessage();
   const [notifyMessage, setNotifyMessage] = useState("");
+  const [notifyStatus, setNotifyStatus] = useState<string | null>(null);
   const [internalNote, setInternalNote] = useState("");
 
   if (isLoading) {
@@ -147,26 +147,35 @@ export default function CaseDetailPage() {
     });
   };
 
-  const handleNotify = (channel: "sms" | "email" | "whatsapp" | "both") => {
+  const handleNotify = async (channel: "sms" | "email" | "whatsapp" | "both") => {
     if (!notifyMessage.trim()) return;
     const msg = notifyMessage;
-    if (channel === "both" || channel === "email") {
-      sendNotification.mutate({
-        caseId: caseData.id,
-        channel: "email",
-        recipient: caseData.victimEmail,
-        message: msg,
-      });
+    setNotifyStatus(null);
+    const notes: string[] = [];
+    try {
+      if (channel === "both" || channel === "email") {
+        const res = await sendNotification.mutateAsync({
+          caseId: caseData.id,
+          channel: "email",
+          recipient: caseData.victimEmail,
+          message: msg,
+        });
+        notes.push(res.note ?? `Email ${res.status}`);
+      }
+      if (channel === "both" || channel === "sms") {
+        const res = await sendNotification.mutateAsync({
+          caseId: caseData.id,
+          channel: "sms",
+          recipient: caseData.victimPhone,
+          message: msg,
+        });
+        notes.push(res.note ?? `SMS ${res.status}`);
+      }
+      setNotifyStatus(notes.join(" · "));
+      setNotifyMessage("");
+    } catch {
+      setNotifyStatus("Failed to queue notification — check delivery keys in Settings.");
     }
-    if (channel === "both" || channel === "sms") {
-      sendNotification.mutate({
-        caseId: caseData.id,
-        channel: "sms",
-        recipient: caseData.victimPhone,
-        message: msg,
-      });
-    }
-    setNotifyMessage("");
   };
 
   const handleInternalNote = () => {
@@ -399,12 +408,17 @@ export default function CaseDetailPage() {
                   >
                     <action.icon className="size-4" />
                     {action.label}
-                    <ExternalLink className="size-3 ml-auto" />
+                    <Badge variant="secondary" className="ml-auto text-[10px]">
+                      Draft
+                    </Badge>
                   </Button>
                 ))}
+                <p className="text-[11px] text-muted-foreground">
+                  These save a local draft only — they do not email LE or platforms. Use Dispatch to prepare outbound packages.
+                </p>
                 {escalate.isSuccess && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Escalation draft recorded (no outbound email sent).
+                  <p className="text-xs text-emerald-700 mt-1">
+                    Escalation draft recorded (no outbound send).
                   </p>
                 )}
               </CardContent>
@@ -414,7 +428,7 @@ export default function CaseDetailPage() {
               <CardHeader><CardTitle>Notify Victim</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  Queues a notification record only — SMS/email provider is not configured.
+                  Attempts provider delivery when Resend/MSG91 keys are set in Settings; otherwise the message stays queued only.
                 </p>
                 <Textarea
                   placeholder="Write update message for victim..."
@@ -453,8 +467,8 @@ export default function CaseDetailPage() {
                     Both
                   </Button>
                 </div>
-                {sendNotification.isSuccess && (
-                  <p className="text-xs text-muted-foreground">Notification queued (not delivered).</p>
+                {notifyStatus && (
+                  <p className="text-xs text-muted-foreground">{notifyStatus}</p>
                 )}
               </CardContent>
             </Card>
