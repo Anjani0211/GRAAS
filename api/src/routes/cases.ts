@@ -340,12 +340,40 @@ router.get("/mine/:id", ...victimOnly, async (req: Request<{ id: string }>, res:
 
 router.get("/", ...staffOnly, async (req: Request, res: Response) => {
   try {
-    const { status, severity, category, limit = "50", offset = "0" } = req.query;
+    const { status, severity, category, q, unassigned, limit = "50", offset = "0" } = req.query;
 
-    const filter: Record<string, string> = {};
+    const filter: Record<string, unknown> = {};
+    const andClauses: Record<string, unknown>[] = [];
     if (status && typeof status === "string") filter.status = status;
     if (severity && typeof severity === "string") filter.severity = severity;
     if (category && typeof category === "string") filter.category = category;
+
+    if (unassigned === "1" || unassigned === "true") {
+      andClauses.push({
+        $or: [
+          { assignedOfficerId: null },
+          { assignedOfficerId: { $exists: false } },
+          { assignedOfficerId: "" },
+        ],
+      });
+      if (!filter.status) andClauses.push({ status: { $ne: "closed" } });
+    }
+
+    if (q && typeof q === "string" && q.trim()) {
+      const escaped = q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const rx = new RegExp(escaped, "i");
+      andClauses.push({
+        $or: [
+          { caseNumber: rx },
+          { victimName: rx },
+          { victimEmail: rx },
+          { description: rx },
+        ],
+      });
+    }
+
+    if (andClauses.length === 1) Object.assign(filter, andClauses[0]);
+    else if (andClauses.length > 1) filter.$and = andClauses;
 
     const cases = await Case.find(filter)
       .sort({ createdAt: -1 })
@@ -378,26 +406,61 @@ router.get("/stats", ...staffOnly, async (_req: Request, res: Response) => {
   try {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const resolvedFilter = resolvedThisMonthFilter(monthStart);
+    const prevResolvedFilter = {
+      status: "closed" as const,
+      $or: [
+        { closedAt: { $gte: prevMonthStart, $lt: monthStart } },
+        {
+          $and: [
+            { $or: [{ closedAt: null }, { closedAt: { $exists: false } }] },
+            { createdAt: { $gte: prevMonthStart, $lt: monthStart } },
+          ],
+        },
+      ],
+    };
 
-    const [totalThisMonth, resolved, highSeverity, allCases, closedResolvedThisMonth] = await Promise.all([
+    const avgMs = (rows: Array<{ closedAt?: Date | null; updatedAt: Date; createdAt: Date }>) =>
+      rows.length > 0
+        ? rows.reduce((sum, c) => {
+            const endMs = c.closedAt
+              ? new Date(c.closedAt).getTime()
+              : new Date(c.updatedAt).getTime();
+            return sum + (endMs - new Date(c.createdAt).getTime());
+          }, 0) / rows.length
+        : 0;
+
+    const [
+      totalThisMonth,
+      resolved,
+      highSeverity,
+      allCases,
+      closedResolvedThisMonth,
+      prevTotal,
+      prevResolved,
+      prevHighSeverity,
+      prevClosedResolved,
+    ] = await Promise.all([
       Case.countDocuments({ createdAt: { $gte: monthStart } }),
       Case.countDocuments(resolvedFilter),
       Case.countDocuments({ severity: "high", createdAt: { $gte: monthStart } }),
       Case.find({ createdAt: { $gte: monthStart } }).lean(),
       Case.find(resolvedFilter).lean(),
+      Case.countDocuments({ createdAt: { $gte: prevMonthStart, $lt: monthStart } }),
+      Case.countDocuments(prevResolvedFilter),
+      Case.countDocuments({
+        severity: "high",
+        createdAt: { $gte: prevMonthStart, $lt: monthStart },
+      }),
+      Case.find(prevResolvedFilter).lean(),
     ]);
 
-    const avgResolutionMs =
-      closedResolvedThisMonth.length > 0
-        ? closedResolvedThisMonth.reduce((sum, c) => {
-            const endMs = c.closedAt
-              ? new Date(c.closedAt).getTime()
-              : new Date(c.updatedAt).getTime();
-            return sum + (endMs - new Date(c.createdAt).getTime());
-          }, 0) / closedResolvedThisMonth.length
-        : 0;
+    const avgResolutionMs = avgMs(closedResolvedThisMonth);
     const avgResolutionDays = +(avgResolutionMs / (1000 * 60 * 60 * 24)).toFixed(1);
+    const prevAvgResolutionDays = +(avgMs(prevClosedResolved) / (1000 * 60 * 60 * 24)).toFixed(1);
+
+    const delta = (current: number, previous: number) => current - previous;
 
     const severityCounts = { high: 0, medium: 0, low: 0 };
     const categoryCounts: Record<string, number> = {};
@@ -453,6 +516,12 @@ router.get("/stats", ...staffOnly, async (_req: Request, res: Response) => {
         resolved,
         avgResolutionDays,
         highSeverity,
+        deltas: {
+          totalThisMonth: delta(totalThisMonth, prevTotal),
+          resolved: delta(resolved, prevResolved),
+          avgResolutionDays: +(avgResolutionDays - prevAvgResolutionDays).toFixed(1),
+          highSeverity: delta(highSeverity, prevHighSeverity),
+        },
       },
       severityCounts,
       categoryCounts,

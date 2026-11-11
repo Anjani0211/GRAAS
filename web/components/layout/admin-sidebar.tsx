@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { BrandLogo } from "@/components/layout/brand-logo";
 import { useSidebarStore, useAuthStore } from "@/lib/store";
 import { isAdminRole } from "@/lib/roles";
+import { useCaseStats, useOsintQueue } from "@/lib/queries";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   LayoutDashboard,
@@ -22,17 +23,17 @@ import {
 } from "lucide-react";
 
 const baseNav = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/cases", label: "Cases", icon: FolderOpen },
-  { href: "/admin/osint", label: "OSINT", icon: Radar },
-  { href: "/admin/threat-graph", label: "Threat Graph", icon: Network },
-  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, badgeKey: null },
+  { href: "/admin/cases", label: "Cases", icon: FolderOpen, badgeKey: "pending" as const },
+  { href: "/admin/osint", label: "OSINT", icon: Radar, badgeKey: "osint" as const },
+  { href: "/admin/threat-graph", label: "Threat Graph", icon: Network, badgeKey: null },
+  { href: "/admin/analytics", label: "Analytics", icon: BarChart3, badgeKey: null },
 ];
 
 const adminOnlyNav = [
-  { href: "/admin/audit", label: "Audit", icon: ScrollText },
-  { href: "/admin/team", label: "Team", icon: Users },
-  { href: "/admin/settings", label: "Settings", icon: Settings },
+  { href: "/admin/audit", label: "Audit", icon: ScrollText, badgeKey: null },
+  { href: "/admin/team", label: "Team", icon: Users, badgeKey: null },
+  { href: "/admin/settings", label: "Settings", icon: Settings, badgeKey: null },
 ];
 
 export function AdminSidebar() {
@@ -40,7 +41,14 @@ export function AdminSidebar() {
   const router = useRouter();
   const { collapsed, toggle } = useSidebarStore();
   const { logout, user } = useAuthStore();
+  const { data: stats } = useCaseStats();
+  const { data: osintQueue } = useOsintQueue();
   const navItems = isAdminRole(user?.role) ? [...baseNav, ...adminOnlyNav] : baseNav;
+
+  const badges: Record<string, number> = {
+    pending: stats?.pendingTriage ?? 0,
+    osint: osintQueue?.length ?? 0,
+  };
 
   return (
     <motion.aside
@@ -77,6 +85,7 @@ export function AdminSidebar() {
             item.href === "/admin/osint"
               ? pathname.startsWith("/admin/osint")
               : pathname.startsWith(item.href);
+          const badgeCount = item.badgeKey ? badges[item.badgeKey] || 0 : 0;
           return (
             <Link
               key={item.href}
@@ -89,16 +98,28 @@ export function AdminSidebar() {
                   : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
               )}
             >
-              <item.icon className="size-5 shrink-0" aria-hidden />
+              <span className="relative shrink-0">
+                <item.icon className="size-5" aria-hidden />
+                {collapsed && badgeCount > 0 && (
+                  <span className="absolute -right-1.5 -top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+                    {badgeCount > 9 ? "9+" : badgeCount}
+                  </span>
+                )}
+              </span>
               <AnimatePresence mode="wait">
                 {!collapsed && (
                   <motion.span
                     initial={{ opacity: 0, width: 0 }}
                     animate={{ opacity: 1, width: "auto" }}
                     exit={{ opacity: 0, width: 0 }}
-                    className="overflow-hidden whitespace-nowrap"
+                    className="flex min-w-0 flex-1 items-center justify-between gap-2 overflow-hidden whitespace-nowrap"
                   >
-                    {item.label}
+                    <span>{item.label}</span>
+                    {badgeCount > 0 && (
+                      <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-mono-technical text-[10px] font-semibold text-primary">
+                        {badgeCount > 99 ? "99+" : badgeCount}
+                      </span>
+                    )}
                   </motion.span>
                 )}
               </AnimatePresence>

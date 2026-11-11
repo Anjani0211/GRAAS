@@ -3,10 +3,21 @@ import { casesApi, triageApi, escalationApi, notificationsApi, osintApi, authApi
 import type { CaseStatus } from "./utils";
 import type { OsintPhase } from "./types";
 
-export function useCases(params?: { status?: string; severity?: string; category?: string }) {
+export function useCases(
+  params?: {
+    status?: string;
+    severity?: string;
+    category?: string;
+    q?: string;
+    unassigned?: boolean;
+    limit?: number;
+  },
+  options?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: ["cases", params],
     queryFn: () => casesApi.list(params),
+    enabled: options?.enabled ?? true,
   });
 }
 

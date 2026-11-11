@@ -357,6 +357,13 @@ export interface CaseStats {
     resolved: number;
     avgResolutionDays: number;
     highSeverity: number;
+    /** Absolute change vs previous calendar month (for avg days: negative = faster). */
+    deltas?: {
+      totalThisMonth: number;
+      resolved: number;
+      avgResolutionDays: number;
+      highSeverity: number;
+    };
   };
   severityCounts: { high: number; medium: number; low: number };
   categoryCounts: Record<string, number>;

@@ -74,11 +74,21 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const casesApi = {
-  list(params?: { status?: string; severity?: string; category?: string; limit?: number; offset?: number }) {
+  list(params?: {
+    status?: string;
+    severity?: string;
+    category?: string;
+    q?: string;
+    unassigned?: boolean;
+    limit?: number;
+    offset?: number;
+  }) {
     const qs = new URLSearchParams();
     if (params?.status) qs.set("status", params.status);
     if (params?.severity) qs.set("severity", params.severity);
     if (params?.category) qs.set("category", params.category);
+    if (params?.q) qs.set("q", params.q);
+    if (params?.unassigned) qs.set("unassigned", "1");
     if (params?.limit) qs.set("limit", String(params.limit));
     if (params?.offset) qs.set("offset", String(params.offset));
     const query = qs.toString();

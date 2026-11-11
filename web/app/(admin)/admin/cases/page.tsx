@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { AdminHeader } from "@/components/layout/admin-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,34 +14,100 @@ import { useCases } from "@/lib/queries";
 import { categoryConfig, type CaseStatus, type Severity } from "@/lib/utils";
 import {
   Search,
-  ArrowUpDown,
   ArrowRight,
   Calendar,
   MapPin,
-  Loader2,
+  FolderOpen,
+  X,
 } from "lucide-react";
 
+type SpecialFilter = "all" | "unassigned" | "pending_triage";
+
 export default function CasesPage() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<CaseStatus | "all">("all");
-  const [severityFilter, setSeverityFilter] = useState<Severity | "all">("all");
+  return (
+    <Suspense
+      fallback={
+        <>
+          <AdminHeader title="All Cases" />
+          <div className="space-y-3 p-6 sm:p-8">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-28 animate-pulse rounded-xl border border-black/[0.06] bg-muted/50"
+              />
+            ))}
+          </div>
+        </>
+      }
+    >
+      <CasesPageInner />
+    </Suspense>
+  );
+}
+
+function CasesPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
+  const [debouncedQ, setDebouncedQ] = useState(searchQuery.trim());
+  const [statusFilter, setStatusFilter] = useState<CaseStatus | "all">(
+    (searchParams.get("status") as CaseStatus) || "all",
+  );
+  const [severityFilter, setSeverityFilter] = useState<Severity | "all">(
+    (searchParams.get("severity") as Severity) || "all",
+  );
+  const [specialFilter, setSpecialFilter] = useState<SpecialFilter>(() => {
+    const f = searchParams.get("filter");
+    if (f === "unassigned" || f === "pending_triage") return f;
+    return "all";
+  });
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedQ(searchQuery.trim()), 250);
+    return () => window.clearTimeout(t);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (debouncedQ) params.set("q", debouncedQ);
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (severityFilter !== "all") params.set("severity", severityFilter);
+    if (specialFilter !== "all") params.set("filter", specialFilter);
+    const qs = params.toString();
+    router.replace(qs ? `/admin/cases?${qs}` : "/admin/cases", { scroll: false });
+  }, [debouncedQ, statusFilter, severityFilter, specialFilter, router]);
+
+  const effectiveStatus =
+    specialFilter === "pending_triage"
+      ? "submitted"
+      : statusFilter !== "all"
+        ? statusFilter
+        : undefined;
 
   const queryParams = {
-    ...(statusFilter !== "all" && { status: statusFilter }),
+    ...(effectiveStatus && { status: effectiveStatus }),
     ...(severityFilter !== "all" && { severity: severityFilter }),
+    ...(debouncedQ && { q: debouncedQ }),
+    ...(specialFilter === "unassigned" && { unassigned: true }),
+    limit: 100,
   };
 
-  const { data: cases, isLoading } = useCases(Object.keys(queryParams).length ? queryParams : undefined);
+  const { data: cases, isLoading } = useCases(queryParams);
+  const list = cases || [];
 
-  const filtered = (cases || []).filter((c) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      c.caseNumber.toLowerCase().includes(q) ||
-      c.victimName.toLowerCase().includes(q) ||
-      c.description.toLowerCase().includes(q)
-    );
-  });
+  const filterLabel = useMemo(() => {
+    if (specialFilter === "unassigned") return "Unassigned open cases";
+    if (specialFilter === "pending_triage") return "Pending triage (submitted)";
+    return null;
+  }, [specialFilter]);
+
+  function clearFilters() {
+    setSearchQuery("");
+    setStatusFilter("all");
+    setSeverityFilter("all");
+    setSpecialFilter("all");
+  }
 
   return (
     <>
@@ -52,15 +119,19 @@ export default function CasesPage() {
               <div className="relative min-w-[min(100%,200px)] flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Search by case number, victim name, or description..."
+                  placeholder="Search by case number, victim name, or email…"
                   className="h-10 rounded-xl border-black/[0.08] bg-muted/30 pl-9 shadow-sm focus-visible:bg-background"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
               <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as CaseStatus | "all")}
+                value={specialFilter === "pending_triage" ? "submitted" : statusFilter}
+                onChange={(e) => {
+                  const v = e.target.value as CaseStatus | "all";
+                  setSpecialFilter("all");
+                  setStatusFilter(v);
+                }}
                 className="h-10 min-w-[9.5rem] rounded-xl border border-input bg-card px-3 text-sm shadow-sm"
               >
                 <option value="all">All Status</option>
@@ -80,57 +151,89 @@ export default function CasesPage() {
                 <option value="medium">Medium</option>
                 <option value="low">Low</option>
               </select>
+              {(debouncedQ || statusFilter !== "all" || severityFilter !== "all" || specialFilter !== "all") && (
+                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                  <X className="size-4" />
+                  Clear
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-muted-foreground">
-            {isLoading ? "Loading..." : <>Showing <span className="font-semibold text-foreground">{filtered.length}</span> cases</>}
+            {isLoading ? (
+              "Loading…"
+            ) : (
+              <>
+                Showing <span className="font-semibold text-foreground">{list.length}</span> cases
+                {filterLabel && (
+                  <span className="text-primary"> · {filterLabel}</span>
+                )}
+              </>
+            )}
           </p>
-          <Button variant="ghost" size="sm">
-            <ArrowUpDown className="size-4" />
-            Sort by Date
-          </Button>
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="size-6 animate-spin text-primary" />
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-28 animate-pulse rounded-xl border border-black/[0.06] bg-muted/50"
+              />
+            ))}
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">No cases found</p>
-          </div>
+        ) : list.length === 0 ? (
+          <Card className="border-black/[0.06]">
+            <CardContent className="flex flex-col items-center gap-3 py-14 text-center">
+              <FolderOpen className="size-9 text-muted-foreground/45" />
+              <div>
+                <p className="text-sm font-medium">No cases match these filters</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Try clearing filters or search by case number / citizen name.
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={clearFilters}>
+                Reset filters
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <div className="space-y-3">
-            {filtered.map((c, i) => (
+            {list.map((c, i) => (
               <motion.div
                 key={c.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.04 }}
+                transition={{ delay: Math.min(i * 0.03, 0.3) }}
               >
                 <Link href={`/admin/case/${c.id}`}>
-                  <Card className="hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 cursor-pointer group">
+                  <Card className="group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
                     <CardContent className="pt-6">
                       <div className="flex items-start gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-mono font-semibold text-primary">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-xs font-semibold text-primary">
                               {c.caseNumber}
                             </span>
                             <SeverityBadge severity={c.severity} pulse={c.severity === "high"} />
                             <CaseStatusBadge status={c.status} />
-                            <Badge variant="secondary" className="capitalize text-[11px]">
-                              {categoryConfig[c.category].label}
+                            <Badge variant="secondary" className="text-[11px] capitalize">
+                              {categoryConfig[c.category]?.label ?? c.category}
                             </Badge>
+                            {!c.assignedOfficerId && c.status !== "closed" && (
+                              <Badge variant="danger" className="text-[10px]">
+                                Unassigned
+                              </Badge>
+                            )}
                           </div>
-                          <h3 className="text-sm font-semibold mt-2">{c.victimName}</h3>
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                          <h3 className="mt-2 text-sm font-semibold">{c.victimName}</h3>
+                          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
                             {c.description}
                           </p>
-                          <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
+                          <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Calendar className="size-3" />
                               {new Date(c.createdAt).toLocaleDateString("en-IN", {
@@ -155,7 +258,7 @@ export default function CasesPage() {
                             )}
                           </div>
                         </div>
-                        <ArrowRight className="size-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-2" />
+                        <ArrowRight className="mt-2 size-5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                       </div>
                     </CardContent>
                   </Card>
