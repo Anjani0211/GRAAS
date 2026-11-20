@@ -132,8 +132,29 @@ export default function VictimCaseDetail() {
 
           <Card>
             <CardHeader><CardTitle>Your Report</CardTitle></CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <p className="text-sm leading-relaxed">{caseData.description}</p>
+              {caseData.ncrpComplaint && (
+                <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    NCRP / I4C fields on file
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Platform: </span>
+                    {caseData.ncrpComplaint.occurredOn || "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">NCRP category: </span>
+                    {caseData.ncrpComplaint.ncrpCategory || "—"}
+                  </p>
+                  {(caseData.ncrpComplaint.transactions?.length ?? 0) > 0 && (
+                    <p>
+                      <span className="text-muted-foreground">Transactions: </span>
+                      {caseData.ncrpComplaint.transactions!.length} recorded
+                    </p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 

@@ -24,6 +24,11 @@ import { logRetentionEvent } from "../jobs/retentionJob";
 import { storageService } from "../services/storageService";
 import { logger } from "../utils/logger";
 import { sendEmail } from "../services/notificationDelivery";
+import {
+  NcrpComplaintZ,
+  mapGrassCategoryToNcrp,
+  type NcrpComplaint,
+} from "../types/ncrpComplaint";
 
 const router = Router();
 const staffOnly = [authenticate, authorize(...ANALYST_ROLES)] as const;
@@ -59,6 +64,7 @@ const CreateCaseSchema = z
     guardianName: z.string().optional(),
     guardianContact: z.string().optional(),
     triageFlags: z.array(z.string()).optional().default([]),
+    ncrpComplaint: NcrpComplaintZ.optional(),
   })
   .superRefine((val, ctx) => {
     if (val.complainantIsMinor) {
@@ -77,7 +83,72 @@ const CreateCaseSchema = z
         });
       }
     }
+    if (val.description.trim().length < 200) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["description"],
+        message: "Incident details must be at least 200 characters (NCRP checklist)",
+      });
+    }
+    if (!val.district?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["district"],
+        message: "District is required (NCRP address)",
+      });
+    }
+    if (!val.state?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["state"],
+        message: "State is required (NCRP address)",
+      });
+    }
+    const ncrp = val.ncrpComplaint;
+    if (ncrp && !ncrp.parentOrSpouseName?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["ncrpComplaint", "parentOrSpouseName"],
+        message: "Father/Mother/Spouse name is required",
+      });
+    }
+    if (ncrp && !ncrp.occurredOn?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["ncrpComplaint", "occurredOn"],
+        message: "Where the incident occurred is required",
+      });
+    }
+    const financial =
+      val.category === "financial_fraud" || val.category === "phishing";
+    if (financial) {
+      const txs = (ncrp?.transactions ?? []).filter(
+        (t) => (t.amount != null && t.amount > 0) || (t.utr && t.utr.trim()),
+      );
+      if (txs.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["ncrpComplaint", "transactions"],
+          message:
+            "Financial fraud requires at least one transaction (bank/wallet, UTR, date, amount)",
+        });
+      }
+    }
   });
+
+function parseNcrpComplaint(raw: unknown): NcrpComplaint | undefined {
+  if (raw == null || raw === "") return undefined;
+  let value: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      return undefined;
+    }
+  }
+  const parsed = NcrpComplaintZ.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+}
 
 const AssignCaseSchema = z.object({
   /** Staff user id; null/empty clears assignment. */
@@ -189,16 +260,33 @@ router.post("/", multipartEvidenceOnly, async (req: Request, res: Response) => {
       triageFlags.push("complainant_is_minor");
     }
 
+    const ncrpComplaint = parseNcrpComplaint(raw.ncrpComplaint);
+    if (ncrpComplaint && !ncrpComplaint.ncrpCategory) {
+      ncrpComplaint.ncrpCategory = mapGrassCategoryToNcrp(String(raw.category ?? ""));
+    }
+
+    let monetaryLoss: number | undefined =
+      raw.monetaryLoss === undefined || raw.monetaryLoss === "" || raw.monetaryLoss === null
+        ? undefined
+        : Number(raw.monetaryLoss);
+    if (
+      (monetaryLoss == null || Number.isNaN(monetaryLoss)) &&
+      ncrpComplaint?.transactions?.length
+    ) {
+      const sum = ncrpComplaint.transactions.reduce(
+        (acc, t) => acc + (typeof t.amount === "number" && !Number.isNaN(t.amount) ? t.amount : 0),
+        0,
+      );
+      if (sum > 0) monetaryLoss = sum;
+    }
+
     const data = CreateCaseSchema.parse({
       victimName: raw.victimName,
       victimEmail: raw.victimEmail,
       victimPhone: raw.victimPhone,
       category: raw.category,
       description: raw.description,
-      monetaryLoss:
-        raw.monetaryLoss === undefined || raw.monetaryLoss === "" || raw.monetaryLoss === null
-          ? undefined
-          : Number(raw.monetaryLoss),
+      monetaryLoss,
       incidentDate: raw.incidentDate ? String(raw.incidentDate) : undefined,
       state: raw.state ? String(raw.state) : undefined,
       district: raw.district ? String(raw.district) : undefined,
@@ -207,6 +295,7 @@ router.post("/", multipartEvidenceOnly, async (req: Request, res: Response) => {
       guardianName: raw.guardianName ? String(raw.guardianName) : undefined,
       guardianContact: raw.guardianContact ? String(raw.guardianContact) : undefined,
       triageFlags,
+      ncrpComplaint,
     });
 
     const evidenceFiles: IEvidenceFile[] = [];

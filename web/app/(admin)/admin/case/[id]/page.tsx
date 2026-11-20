@@ -313,6 +313,111 @@ export default function CaseDetailPage() {
               </CardContent>
             </Card>
 
+            {caseData.ncrpComplaint && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>NCRP / I4C complaint block</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 text-sm">
+                    <div>
+                      <dt className="text-xs text-muted-foreground">NCRP category</dt>
+                      <dd className="mt-0.5 font-medium">{caseData.ncrpComplaint.ncrpCategory || "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Platform / channel</dt>
+                      <dd className="mt-0.5 font-medium">{caseData.ncrpComplaint.occurredOn || "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Incident time</dt>
+                      <dd className="mt-0.5 font-medium">{caseData.ncrpComplaint.incidentTime || "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Parent / spouse</dt>
+                      <dd className="mt-0.5 font-medium">{caseData.ncrpComplaint.parentOrSpouseName || "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Relationship</dt>
+                      <dd className="mt-0.5 font-medium capitalize">{caseData.ncrpComplaint.relationshipToVictim || "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Address</dt>
+                      <dd className="mt-0.5 font-medium">
+                        {[caseData.ncrpComplaint.addressLine, caseData.ncrpComplaint.pincode]
+                          .filter(Boolean)
+                          .join(", ") || "—"}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  {(caseData.ncrpComplaint.transactions?.length ?? 0) > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Transactions
+                      </p>
+                      <div className="overflow-x-auto rounded-xl border border-border">
+                        <table className="w-full min-w-[36rem] text-left text-sm">
+                          <thead className="bg-muted/40 text-xs text-muted-foreground">
+                            <tr>
+                              <th className="px-3 py-2 font-medium">Bank / wallet</th>
+                              <th className="px-3 py-2 font-medium">UTR</th>
+                              <th className="px-3 py-2 font-medium">Date</th>
+                              <th className="px-3 py-2 font-medium">Amount</th>
+                              <th className="px-3 py-2 font-medium">Beneficiary</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {caseData.ncrpComplaint.transactions!.map((t, i) => (
+                              <tr key={i} className="border-t border-border">
+                                <td className="px-3 py-2">{t.bankOrWallet || "—"}</td>
+                                <td className="px-3 py-2 font-mono text-xs">{t.utr || "—"}</td>
+                                <td className="px-3 py-2">{t.date || "—"}</td>
+                                <td className="px-3 py-2">
+                                  {typeof t.amount === "number"
+                                    ? `₹${t.amount.toLocaleString("en-IN")}`
+                                    : "—"}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {t.beneficiaryUpi || t.beneficiaryAccount || "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {(caseData.ncrpComplaint.suspects?.length ?? 0) > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Suspects
+                      </p>
+                      <ul className="space-y-2">
+                        {caseData.ncrpComplaint.suspects!.map((s, i) => (
+                          <li
+                            key={i}
+                            className="rounded-xl border border-border bg-muted/20 px-3 py-2 text-sm"
+                          >
+                            {[s.name, s.mobile, s.email, s.upi, s.urlOrHandle]
+                              .filter(Boolean)
+                              .join(" · ") || "—"}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {caseData.ncrpComplaint.additionalInfo && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Additional info</p>
+                      <p className="mt-1 text-sm leading-relaxed">{caseData.ncrpComplaint.additionalInfo}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader><CardTitle>Evidence Gallery</CardTitle></CardHeader>
               <CardContent>

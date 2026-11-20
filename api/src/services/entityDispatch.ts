@@ -317,8 +317,35 @@ function ncrpBody(args: {
   state?: string;
   district?: string;
   victimName: string;
+  occurredOn?: string;
+  ncrpCategory?: string;
+  transactions?: Array<{ utr?: string; amount?: number; bankOrWallet?: string; date?: string }>;
 }): string {
-  const { caseNumber, lossInr, category, state, district, victimName } = args;
+  const {
+    caseNumber,
+    lossInr,
+    category,
+    state,
+    district,
+    victimName,
+    occurredOn,
+    ncrpCategory,
+    transactions,
+  } = args;
+  const txLines =
+    transactions && transactions.length > 0
+      ? [
+          ``,
+          `Reported transactions (NCRP financial block):`,
+          ...transactions.slice(0, 12).map((t, i) => {
+            const amt =
+              typeof t.amount === "number" && !Number.isNaN(t.amount)
+                ? formatINR(t.amount)
+                : "—";
+            return `  ${i + 1}. UTR ${t.utr || "—"} · ${amt} · ${t.bankOrWallet || "—"} · ${t.date || "—"}`;
+          }),
+        ]
+      : [];
   return [
     `To,`,
     `The National Cybercrime Reporting Portal (NCRP) / 1930 Helpline`,
@@ -335,7 +362,10 @@ function ncrpBody(args: {
     `  • Victim          : ${victimName}`,
     `  • Jurisdiction    : ${district ?? "—"}, ${state ?? "—"}`,
     `  • Category        : ${category.replace(/_/g, " ")}`,
+    `  • NCRP category   : ${ncrpCategory || "—"}`,
+    `  • Platform        : ${occurredOn || "—"}`,
     `  • Reported loss   : ${formatINR(lossInr)}`,
+    ...txLines,
     ``,
     `The attached GRASSReport/1.0 PDF carries the full evidence manifest`,
     `(BSA §63 hashed), extracted indicators, OSINT enrichments, and a`,
@@ -834,6 +864,9 @@ export function buildDispatchPlan(
         state: caseDoc.state,
         district: caseDoc.district,
         victimName: caseDoc.victimName,
+        occurredOn: caseDoc.ncrpComplaint?.occurredOn,
+        ncrpCategory: caseDoc.ncrpComplaint?.ncrpCategory,
+        transactions: caseDoc.ncrpComplaint?.transactions,
       }),
     ),
     actionTargets: [caseDoc.caseNumber],

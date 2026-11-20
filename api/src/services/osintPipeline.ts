@@ -52,6 +52,7 @@ import { runInvestigationLoop } from "../agent/investigationLoop";
 import { runTextOnlyInvestigation } from "../agent/textOnlyInvestigation";
 import type { CaseClassification, InvestigationMemory } from "../types/investigationMemory";
 import { autoDraftDispatchPlan } from "./pipelineAutoDispatch";
+import { ingestComplaintEvidenceIntoInvestigation } from "./ingestComplaintEvidence";
 
 async function loadEvidenceBytes(ev: IOsintEvidenceItem): Promise<Buffer | null> {
   if (ev.storageKey) {
@@ -775,9 +776,50 @@ export async function runInvestigation(
       const t0 = Date.now();
       upsertStageState(inv, "STAGE_1", { status: "RUNNING", startedAt: new Date() });
       emit({ type: "stage_started", stage: "intake", at: nowIso() });
+
+      // Complaint submit stores files on evidenceFiles only — promote into OSINT items
+      // so PDFs/images get hashed, text-extracted, and fed to the AI corpus.
+      try {
+        const promoted = await ingestComplaintEvidenceIntoInvestigation(caseDoc, inv);
+        if (promoted.ingested > 0) {
+          caseDoc.markModified("osintInvestigation");
+          await caseDoc.save();
+          emit({
+            type: "stage_log",
+            stage: "intake",
+            level: "success",
+            message: `Ingested ${promoted.ingested} complaint upload(s) into OSINT (${promoted.extractedChars} chars extracted).`,
+            at: nowIso(),
+          });
+        }
+      } catch (ingestErr) {
+        logger.warn({ err: ingestErr, caseNumber: caseDoc.caseNumber }, "[Pipeline] Complaint evidence ingest failed");
+        emit({
+          type: "stage_log",
+          stage: "intake",
+          level: "warn",
+          message: "Could not ingest some complaint uploads into OSINT evidence.",
+          at: nowIso(),
+        });
+      }
+
       for (const ev of inv.evidenceItems) {
-        const payload = `${ev.fileName}|${ev.ocrText ?? ""}|${ev.createdAt.toISOString()}`;
-        const { sha256, size } = sha256OfString(payload);
+        // Prefer content SHA-256 from MinIO ingest; fall back to legacy text hash.
+        let sha256 = (ev.sha256 || "").trim();
+        let size = (ev.ocrText ?? "").length;
+        if (!sha256) {
+          const payload = `${ev.fileName}|${ev.ocrText ?? ""}|${ev.createdAt.toISOString()}`;
+          const hashed = sha256OfString(payload);
+          sha256 = hashed.sha256;
+          size = hashed.size;
+        } else {
+          try {
+            const bytes = await loadEvidenceBytes(ev);
+            if (bytes) size = bytes.length;
+          } catch {
+            /* keep ocr length */
+          }
+        }
         const record: IOsintHashRecord = {
           evidenceId: ev.id,
           fileName: ev.fileName,
@@ -787,11 +829,15 @@ export async function runInvestigation(
           ingestedAt: ev.createdAt,
         };
         hashManifest.push(record);
+        const textHint =
+          (ev.ocrText ?? "").trim().length > 0
+            ? `${(ev.ocrText ?? "").trim().length} chars text`
+            : "no text layer";
         emit({
           type: "stage_log",
           stage: "intake",
           level: "info",
-          message: `Hashed ${ev.fileName} → ${shortHash(sha256)}`,
+          message: `Hashed ${ev.fileName} → ${shortHash(sha256)} (${textHint})`,
           at: nowIso(),
         });
       }

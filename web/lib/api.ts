@@ -146,6 +146,7 @@ export const casesApi = {
     guardianName?: string;
     guardianContact?: string;
     triageFlags?: string[];
+    ncrpComplaint?: Record<string, unknown>;
   }) {
     const { files, evidenceUrl, ...data } = input;
     const hasFiles = files && files.length > 0;
@@ -170,6 +171,7 @@ export const casesApi = {
       if (data.guardianName) fd.append("guardianName", data.guardianName);
       if (data.guardianContact) fd.append("guardianContact", data.guardianContact);
       if (data.triageFlags?.length) fd.append("triageFlags", JSON.stringify(data.triageFlags));
+      if (data.ncrpComplaint) fd.append("ncrpComplaint", JSON.stringify(data.ncrpComplaint));
       if (hasUrl) fd.append("evidenceUrl", urlTrim);
       if (hasFiles) {
         for (const f of files!) {

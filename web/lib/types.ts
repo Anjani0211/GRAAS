@@ -230,6 +230,40 @@ export interface Case {
   guardianName?: string;
   guardianContact?: string;
   triageFlags?: string[];
+  /** NCRP / I4C aligned complaint block (cybercrime.gov.in). */
+  ncrpComplaint?: {
+    gender?: "male" | "female" | "other" | "prefer_not_to_say";
+    dob?: string;
+    parentOrSpouseName?: string;
+    relationshipToVictim?: string;
+    addressLine?: string;
+    pincode?: string;
+    occurredOn?: string;
+    delayReason?: string;
+    incidentTime?: string;
+    ncrpCategory?: string;
+    ncrpSubCategory?: string;
+    additionalInfo?: string;
+    transactions?: Array<{
+      bankOrWallet?: string;
+      utr?: string;
+      date?: string;
+      amount?: number;
+      beneficiaryUpi?: string;
+      beneficiaryAccount?: string;
+      ifsc?: string;
+      mode?: string;
+    }>;
+    suspects?: Array<{
+      name?: string;
+      mobile?: string;
+      email?: string;
+      upi?: string;
+      bankAccount?: string;
+      urlOrHandle?: string;
+      address?: string;
+    }>;
+  };
   osintInvestigation?: OsintInvestigation;
 }
 

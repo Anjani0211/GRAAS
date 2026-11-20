@@ -194,6 +194,43 @@ export interface ICase extends Document {
   incidentDate?: Date;
   state?: string;
   district?: string;
+  /**
+   * NCRP / I4C aligned complaint fields (cybercrime.gov.in “Report Other Cybercrime”).
+   * Stored separately so OSINT intake can keep using description + top-level loss/date.
+   */
+  ncrpComplaint?: {
+    gender?: "male" | "female" | "other" | "prefer_not_to_say";
+    dob?: string;
+    parentOrSpouseName?: string;
+    relationshipToVictim?: string;
+    addressLine?: string;
+    pincode?: string;
+    occurredOn?: string;
+    delayReason?: string;
+    incidentTime?: string;
+    ncrpCategory?: string;
+    ncrpSubCategory?: string;
+    additionalInfo?: string;
+    transactions?: Array<{
+      bankOrWallet?: string;
+      utr?: string;
+      date?: string;
+      amount?: number;
+      beneficiaryUpi?: string;
+      beneficiaryAccount?: string;
+      ifsc?: string;
+      mode?: string;
+    }>;
+    suspects?: Array<{
+      name?: string;
+      mobile?: string;
+      email?: string;
+      upi?: string;
+      bankAccount?: string;
+      urlOrHandle?: string;
+      address?: string;
+    }>;
+  };
   /** Staff User._id (string). */
   assignedOfficerId?: string;
   assignedOfficerName?: string;
@@ -427,6 +464,52 @@ const CaseSchema = new Schema<ICase>(
     incidentDate: Date,
     state: String,
     district: String,
+    ncrpComplaint: {
+      type: new Schema(
+        {
+          gender: {
+            type: String,
+            enum: ["male", "female", "other", "prefer_not_to_say"],
+          },
+          dob: String,
+          parentOrSpouseName: String,
+          relationshipToVictim: String,
+          addressLine: String,
+          pincode: String,
+          occurredOn: String,
+          delayReason: String,
+          incidentTime: String,
+          ncrpCategory: String,
+          ncrpSubCategory: String,
+          additionalInfo: String,
+          transactions: [
+            {
+              bankOrWallet: String,
+              utr: String,
+              date: String,
+              amount: Number,
+              beneficiaryUpi: String,
+              beneficiaryAccount: String,
+              ifsc: String,
+              mode: String,
+            },
+          ],
+          suspects: [
+            {
+              name: String,
+              mobile: String,
+              email: String,
+              upi: String,
+              bankAccount: String,
+              urlOrHandle: String,
+              address: String,
+            },
+          ],
+        },
+        { _id: false },
+      ),
+      required: false,
+    },
     /** User._id of assigned staff officer (string form for API stability). */
     assignedOfficerId: { type: String, index: true },
     assignedOfficerName: { type: String, trim: true },
