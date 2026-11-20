@@ -1,0 +1,40 @@
+# Render Blueprint — GRAAS API (free web service).
+# Requires env groups / dashboard secrets for Mongo + Redis (see DEPLOY.md).
+services:
+  - type: web
+    name: graas-api
+    runtime: docker
+    plan: free
+    region: singapore
+    rootDir: api
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "8000"
+      - key: SSRF_PROTECTION
+        value: "true"
+      - key: REQUIRE_REDIS
+        value: "true"
+      # Set these in the Render dashboard (Blueprint sync will keep keys, not secrets):
+      - key: MONGODB_URI
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: LLM_BASE_URL
+        value: https://openrouter.ai/api/v1
+      - key: LLM_MODEL
+        value: nvidia/nemotron-3.5-lightning:free
+      - key: LLM_TOOLS_ENABLED
+        value: "true"

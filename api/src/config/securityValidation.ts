@@ -31,16 +31,26 @@ export function validateSecurityConfig(): void {
     if (config.corsOrigins.includes("*")) {
       throw new Error("CORS_ORIGIN must not be '*' in production");
     }
-    if (!config.neo4jPassword || WEAK_PASSWORDS.has(config.neo4jPassword)) {
-      throw new Error("NEO4J_PASSWORD must be a strong non-default value in production");
+    // Only enforce when the service is actually configured for this deploy.
+    if (config.neo4jUri) {
+      if (!config.neo4jPassword || WEAK_PASSWORDS.has(config.neo4jPassword)) {
+        throw new Error("NEO4J_PASSWORD must be a strong non-default value when NEO4J_URI is set");
+      }
     }
-    if (!config.minioSecretKey || WEAK_PASSWORDS.has(config.minioSecretKey)) {
-      throw new Error("MINIO_SECRET_KEY must be a strong non-default value in production");
+    if (config.minioEndpoint) {
+      if (!config.minioSecretKey || WEAK_PASSWORDS.has(config.minioSecretKey)) {
+        throw new Error("MINIO_SECRET_KEY must be a strong non-default value when MINIO_ENDPOINT is set");
+      }
     }
-    if (config.requireRedisInProduction && !process.env.REDIS_HOST && !process.env.REDIS_URL) {
+    if (
+      config.requireRedisInProduction &&
+      !process.env.REDIS_HOST &&
+      !process.env.REDIS_URL &&
+      config.redisHost === "localhost"
+    ) {
       throw new Error("REDIS_HOST or REDIS_URL is required in production (set REQUIRE_REDIS=false to override)");
     }
-    if (!process.env.REDIS_HOST && !process.env.REDIS_URL) {
+    if (!process.env.REDIS_HOST && !process.env.REDIS_URL && config.redisHost === "localhost") {
       logger.warn("[Security] REDIS_HOST/URL unset in production — token blocklist may be in-memory only");
     }
   } else if (INSECURE_JWT_SECRETS.has(config.jwtSecret)) {

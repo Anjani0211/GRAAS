@@ -9,17 +9,28 @@ class RedisClient {
 
   async connect(): Promise<void> {
     try {
-      this.client = new Redis({
-        host: config.redisHost,
-        port: config.redisPort,
-        password: config.redisPassword,
-        maxRetriesPerRequest: 3,
-        lazyConnect: true,
-        enableOfflineQueue: false,
-        retryStrategy: () => null,
-        reconnectOnError: () => false,
-        connectTimeout: 1500,
-      });
+      const redisUrl = process.env.REDIS_URL?.trim();
+      this.client = redisUrl
+        ? new Redis(redisUrl, {
+            maxRetriesPerRequest: 3,
+            lazyConnect: true,
+            enableOfflineQueue: false,
+            retryStrategy: () => null,
+            reconnectOnError: () => false,
+            connectTimeout: 4000,
+            tls: redisUrl.startsWith("rediss://") ? {} : undefined,
+          })
+        : new Redis({
+            host: config.redisHost,
+            port: config.redisPort,
+            password: config.redisPassword,
+            maxRetriesPerRequest: 3,
+            lazyConnect: true,
+            enableOfflineQueue: false,
+            retryStrategy: () => null,
+            reconnectOnError: () => false,
+            connectTimeout: 1500,
+          });
       // Prevent noisy "Unhandled error event" when Redis is down.
       // Only log connection errors after Redis was previously available.
       this.client.on("error", (err) => {

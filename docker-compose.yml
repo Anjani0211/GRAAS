@@ -89,7 +89,7 @@ services:
     profiles: ["app"]
     build:
       context: ./api
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.chrome
     container_name: grass-api
     ports:
       - "${PORT:-8000}:8000"
