@@ -29,7 +29,15 @@ import type { CaseStatus } from "./utils";
  */
 function resolveApiBase(): string {
   const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (configured) return configured.replace(/\/$/, "");
+  // Prefer same-origin /api on Vercel (rewrites → Render) so auth cookies are first-party.
+  if (process.env.NEXT_PUBLIC_API_SAME_ORIGIN === "true") {
+    return "/api";
+  }
+  if (configured) {
+    // Absolute cross-origin URL — works only if cookies are SameSite=None (not for middleware).
+    if (configured.startsWith("/")) return configured.replace(/\/$/, "") || "/api";
+    return configured.replace(/\/$/, "");
+  }
   if (typeof window !== "undefined") {
     return `${window.location.protocol}//${window.location.hostname}:8000/api`;
   }

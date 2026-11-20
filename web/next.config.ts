@@ -20,6 +20,21 @@ for (const iface of Object.values(os.networkInterfaces())) {
 
 const onVercel = Boolean(process.env.VERCEL);
 
+/** Proxy browser /api/* to the Render API so httpOnly cookies stay first-party. */
+function apiProxyTarget(): string | null {
+  const raw = (process.env.API_PROXY_TARGET || process.env.NEXT_PUBLIC_API_URL || "").trim();
+  if (!raw || raw.startsWith("/")) return null;
+  try {
+    const u = new URL(raw.includes("://") ? raw : `https://${raw}`);
+    // NEXT_PUBLIC_API_URL is often ".../api" — upstream host only.
+    return u.origin;
+  } catch {
+    return null;
+  }
+}
+
+const proxyTarget = apiProxyTarget();
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   devIndicators: false,
@@ -29,6 +44,15 @@ const nextConfig: NextConfig = {
   // Monorepo root has package-lock.json — pin Turbopack to web/ so deps resolve correctly.
   turbopack: {
     root: webRoot,
+  },
+  async rewrites() {
+    if (!onVercel || !proxyTarget) return [];
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${proxyTarget}/api/:path*`,
+      },
+    ];
   },
 };
 

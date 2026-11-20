@@ -187,21 +187,23 @@ export function signToken(userId: string, role: UserRole): string {
 export const AUTH_COOKIE_NAME = "graas_token";
 export const AUTH_COOKIE_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 
-export function setAuthCookie(res: Response, token: string): void {
-  res.cookie(AUTH_COOKIE_NAME, token, {
+function authCookieOptions() {
+  const secure = config.nodeEnv === "production";
+  // Cross-site (Vercel UI → Render API) needs None+Secure; same-origin proxy can use Lax.
+  const crossSite = process.env.AUTH_COOKIE_CROSS_SITE === "true";
+  return {
     httpOnly: true,
-    secure: config.nodeEnv === "production",
-    sameSite: "lax",
+    secure: crossSite ? true : secure,
+    sameSite: (crossSite ? "none" : "lax") as "none" | "lax",
     maxAge: AUTH_COOKIE_MAX_AGE_MS,
     path: "/",
-  });
+  };
+}
+
+export function setAuthCookie(res: Response, token: string): void {
+  res.cookie(AUTH_COOKIE_NAME, token, authCookieOptions());
 }
 
 export function clearAuthCookie(res: Response): void {
-  res.clearCookie(AUTH_COOKIE_NAME, {
-    httpOnly: true,
-    secure: config.nodeEnv === "production",
-    sameSite: "lax",
-    path: "/",
-  });
+  res.clearCookie(AUTH_COOKIE_NAME, authCookieOptions());
 }
