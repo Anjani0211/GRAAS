@@ -32,9 +32,29 @@ const router = Router();
 const ENTITY_TYPES = ["phone", "upi", "email", "url", "domain", "ipv4", "wallet", "telegram", "username"] as const;
 const CONFIDENCES = ["VERIFIED", "HIGH", "MEDIUM", "LOW", "UNVERIFIED"] as const;
 
+/** Accept full ISO datetime or HTML date input (YYYY-MM-DD). Empty → undefined. */
+const DateFilter = z.preprocess(
+  (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+  z
+    .string()
+    .trim()
+    .min(1)
+    .refine(
+      (v) =>
+        /^\d{4}-\d{2}-\d{2}$/.test(v) ||
+        !Number.isNaN(Date.parse(v)),
+      { message: "Invalid date" },
+    )
+    .transform((v) => {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return `${v}T00:00:00.000Z`;
+      return new Date(v).toISOString();
+    })
+    .optional(),
+);
+
 const FiltersQ = z.object({
-  from: z.string().datetime().optional(),
-  to: z.string().datetime().optional(),
+  from: DateFilter,
+  to: DateFilter,
   entityTypes: z
     .union([z.array(z.enum(ENTITY_TYPES)), z.enum(ENTITY_TYPES)])
     .optional(),
@@ -49,6 +69,37 @@ function asEntityTypeArray(
   if (!v) return undefined;
   if (Array.isArray(v)) return [...v];
   return [v as OsintEntityType];
+}
+
+/** Agent tools often key enrichments by callId — also match on detail values. */
+function resolveEntityConfidence(
+  entityId: string,
+  value: string,
+  enrichments: Array<{ entityId: string; confidence: OsintConfidence; details?: Record<string, unknown> }> | undefined,
+): OsintConfidence | undefined {
+  if (!enrichments?.length) return undefined;
+  const byId = enrichments.find((en) => en.entityId === entityId);
+  if (byId) return byId.confidence;
+  const needle = value.toLowerCase();
+  for (const en of enrichments) {
+    const d = en.details ?? {};
+    for (const k of [
+      "entity",
+      "phone",
+      "upi",
+      "email",
+      "domain",
+      "url",
+      "username",
+      "value",
+      "vpa",
+      "handle",
+    ]) {
+      const raw = d[k];
+      if (raw != null && String(raw).toLowerCase() === needle) return en.confidence;
+    }
+  }
+  return undefined;
 }
 
 type RawRow = {
@@ -87,10 +138,6 @@ async function fetchEntityRows(filters: {
   for (const c of cases) {
     const inv = c.osintInvestigation;
     if (!inv?.entities?.length) continue;
-    const confByEntityId = new Map<string, OsintConfidence>();
-    for (const en of inv.enrichments ?? []) {
-      confByEntityId.set(en.entityId, en.confidence);
-    }
     for (const e of inv.entities) {
       if (!e.valid) continue;
       const key = `${e.type}::${e.value.toLowerCase()}`;
@@ -106,7 +153,7 @@ async function fetchEntityRows(filters: {
         lossInr: c.monetaryLoss ?? 0,
         incidentDate:
           (c.incidentDate ?? c.createdAt ?? new Date()).toISOString(),
-        confidence: confByEntityId.get(e.id),
+        confidence: resolveEntityConfidence(e.id, e.value, inv.enrichments),
       });
     }
   }
@@ -120,7 +167,8 @@ router.get("/global", async (req: Request, res: Response) => {
       from: parsed.from,
       to: parsed.to,
       entityTypes: asEntityTypeArray(parsed.entityTypes),
-      minCaseCount: parsed.minCaseCount ?? 2, // global view: at least 2 cases by default
+      // Default 1 so single-case deployments still render; UI can raise the floor.
+      minCaseCount: parsed.minCaseCount ?? 1,
       minConfidence: parsed.minConfidence,
       nodeLimit: parsed.nodeLimit,
     };
@@ -179,10 +227,6 @@ router.get(
       for (const c of cases) {
         const inv = c.osintInvestigation;
         if (!inv?.entities?.length) continue;
-        const confByEntityId = new Map<string, OsintConfidence>();
-        for (const en of inv.enrichments ?? []) {
-          confByEntityId.set(en.entityId, en.confidence);
-        }
         for (const e of inv.entities) {
           if (!e.valid) continue;
           const k = `${e.type}::${e.value.toLowerCase()}`;
@@ -197,7 +241,7 @@ router.get(
             caseStatus: c.status,
             lossInr: c.monetaryLoss ?? 0,
             incidentDate: (c.incidentDate ?? c.createdAt ?? new Date()).toISOString(),
-            confidence: confByEntityId.get(e.id),
+            confidence: resolveEntityConfidence(e.id, e.value, inv.enrichments),
           });
         }
       }
@@ -226,7 +270,7 @@ router.get("/top-threats", async (req: Request, res: Response) => {
       from: parsed.from,
       to: parsed.to,
       entityTypes: asEntityTypeArray(parsed.entityTypes),
-      minCaseCount: parsed.minCaseCount ?? 2,
+      minCaseCount: parsed.minCaseCount ?? 1,
       minConfidence: parsed.minConfidence,
     };
     const raw = await fetchEntityRows({ from: parsed.from, to: parsed.to });
