@@ -7,9 +7,14 @@ services:
     plan: free
     region: singapore
     rootDir: api
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./Dockerfile.bundle
     dockerContext: .
     healthCheckPath: /api/health
+    autoDeploy: true
+    branch: main
+    buildFilter:
+      paths:
+        - api/**
     envVars:
       - key: NODE_ENV
         value: production
@@ -19,17 +24,16 @@ services:
         value: "true"
       - key: REQUIRE_REDIS
         value: "true"
-      # Set these in the Render dashboard (Blueprint sync will keep keys, not secrets):
       - key: MONGODB_URI
-        sync: false
+        value: mongodb://127.0.0.1:27017/graas
       - key: REDIS_URL
         sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGIN
-        sync: false
+        value: https://graas-alpha.vercel.app
       - key: PUBLIC_BASE_URL
-        sync: false
+        value: https://graas-api.onrender.com
       - key: OPENROUTER_API_KEY
         sync: false
       - key: LLM_BASE_URL
