@@ -139,7 +139,7 @@ export function escalationDeepLinks(caseNumber: string): Array<{
     {
       id: "i4c",
       label: "I4C / Suspect Registry (reference)",
-      url: "https://www.i4c.gov.in/",
+      url: "https://i4c.mha.gov.in/",
       note: `Reference case ${caseNumber} when coordinating LE`,
     },
   ];
