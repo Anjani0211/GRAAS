@@ -1,14 +1,10 @@
-# Free Render web service: MongoDB + tiny HTTP health on $PORT.
-# Mongo listens on 27017 for private-network peers (not published as public HTTP).
+# Free Render web service: MongoDB + busybox httpd health on $PORT.
 FROM mongo:7
 
 USER root
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 \
-  && rm -rf /var/lib/apt/lists/*
-
+COPY --from=busybox:1.36.1-musl /bin/busybox /usr/local/bin/busybox
 COPY start.sh /start.sh
-RUN chmod +x /start.sh
+RUN chmod +x /start.sh /usr/local/bin/busybox
 
 ENV PORT=8080
 EXPOSE 8080 27017

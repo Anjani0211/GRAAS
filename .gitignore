@@ -49,3 +49,6 @@ PROGRESS.md.new
 
 # Docker / local volumes (if ever copied in)
 grass_*_data/
+
+api/.node-bin/
+api/.mongo-bin/

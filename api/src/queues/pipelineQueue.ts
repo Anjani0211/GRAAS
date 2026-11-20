@@ -22,19 +22,25 @@ export function initPipelineQueue(): void {
     logger.warn("[Queue] Bull queue disabled — Redis unavailable");
     return;
   }
-  queue = new Bull<PipelineJobData>("osint-pipeline", {
-    redis: {
-      host: config.redisHost,
-      port: config.redisPort,
-      password: config.redisPassword,
-    },
+  const redisUrl = process.env.REDIS_URL?.trim();
+  const jobOpts = {
     defaultJobOptions: {
       attempts: 3,
-      backoff: { type: "exponential", delay: 2000 },
+      backoff: { type: "exponential" as const, delay: 2000 },
       removeOnComplete: 50,
       removeOnFail: 100,
     },
-  });
+  };
+  queue = redisUrl
+    ? new Bull<PipelineJobData>("osint-pipeline", redisUrl, jobOpts)
+    : new Bull<PipelineJobData>("osint-pipeline", {
+        ...jobOpts,
+        redis: {
+          host: config.redisHost,
+          port: config.redisPort,
+          password: config.redisPassword,
+        },
+      });
   queue.on("error", (err: Error) => logger.error({ err }, "[Queue] Bull error"));
   queue.on("failed", (job, err: Error) =>
     logger.error({ jobId: job?.id, caseId: job?.data?.caseId, err }, "[Queue] Job failed"),
