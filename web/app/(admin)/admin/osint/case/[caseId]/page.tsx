@@ -31,6 +31,7 @@ import { categoryConfig, statusConfig, cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/store";
 import { resolveRefreshedScreenshotHref, screenshotHref } from "@/lib/screenshot-links";
 import { DispatchPanel } from "@/components/osint/dispatch-panel";
+import { AssistPanel } from "@/components/osint/assist-panel";
 
 // Dynamically imported to avoid SSR issues with canvas
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
@@ -1258,6 +1259,11 @@ export default function OsintCaseWorkspacePage() {
                     }
                   />
 
+                  <AssistPanel
+                    caseId={caseId}
+                    inlineLinks={collectAssistLinks(inv.enrichments ?? [])}
+                  />
+
                   <div className="space-y-3 rounded-xl border border-border bg-secondary/20 p-4">
                     <p className="text-sm font-semibold">Law-enforcement handoff (legacy)</p>
                     {inv.submittedToLeAt && (
@@ -1664,6 +1670,30 @@ const StageCard = ({
     </motion.div>
   );
 };
+
+function collectAssistLinks(enrichments: OsintEnrichment[]): Array<{ label: string; url: string }> {
+  const out: Array<{ label: string; url: string }> = [];
+  const seen = new Set<string>();
+  for (const en of enrichments) {
+    const d = en.details ?? {};
+    const links = (d.assist_links ?? d.links ?? (d.assist as { wayback_search?: string } | undefined)) as
+      | Record<string, string>
+      | undefined;
+    if (links && typeof links === "object") {
+      for (const [label, url] of Object.entries(links)) {
+        if (typeof url !== "string" || !url.startsWith("http")) continue;
+        if (seen.has(url)) continue;
+        seen.add(url);
+        out.push({ label, url });
+      }
+    }
+    if (typeof d.archive_url === "string" && d.archive_url.startsWith("http") && !seen.has(d.archive_url)) {
+      seen.add(d.archive_url);
+      out.push({ label: "wayback_snapshot", url: d.archive_url });
+    }
+  }
+  return out;
+}
 
 function EmptyStage({ label }: { label: string }) {
   return (

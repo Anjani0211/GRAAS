@@ -16,6 +16,10 @@ import {
   crawlSiteTool,
   emailFootprintTool,
   harvestDomainTool,
+  lookupIfscTool,
+  archiveUrlTool,
+  certTransparencyTool,
+  indiaAssistLinksTool,
 } from "./tools";
 
 export const TOOL_REGISTRY: Array<AgentTool<unknown, unknown>> = [
@@ -35,4 +39,8 @@ export const TOOL_REGISTRY: Array<AgentTool<unknown, unknown>> = [
   crawlSiteTool as unknown as AgentTool<unknown, unknown>,
   emailFootprintTool as unknown as AgentTool<unknown, unknown>,
   harvestDomainTool as unknown as AgentTool<unknown, unknown>,
+  lookupIfscTool as unknown as AgentTool<unknown, unknown>,
+  archiveUrlTool as unknown as AgentTool<unknown, unknown>,
+  certTransparencyTool as unknown as AgentTool<unknown, unknown>,
+  indiaAssistLinksTool as unknown as AgentTool<unknown, unknown>,
 ];

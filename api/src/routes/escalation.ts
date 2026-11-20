@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { Case } from "../models";
 import { logEvent } from "../services/auditLog";
+import { buildEscalationPack } from "../services/escalationPack";
 
 const router = Router();
 
@@ -117,6 +118,29 @@ router.get("/templates", (_req: Request, res: Response) => {
     subject: val.subject,
   }));
   res.json({ templates });
+});
+
+/** LE-ready pack: entities, hashes, related cases, portal deep-links — no outbound send. */
+router.get("/pack/:caseId", async (req: Request, res: Response) => {
+  try {
+    const doc = await lookupCase(String(req.params.caseId));
+    if (!doc) {
+      res.status(404).json({ error: "Case not found" });
+      return;
+    }
+    const pack = buildEscalationPack(doc);
+    await logEvent({
+      userId: req.auth?.userId ?? "system",
+      action: "ESCALATION_PACK",
+      resourceId: doc.caseNumber,
+      outcome: "SUCCESS",
+      ip: req.ip ?? "unknown",
+      metadata: { entityCount: pack.entities.length, hashCount: pack.evidenceHashes.length },
+    });
+    res.json(pack);
+  } catch {
+    res.status(500).json({ error: "Failed to build escalation pack" });
+  }
 });
 
 export default router;

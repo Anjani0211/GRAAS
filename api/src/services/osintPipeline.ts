@@ -38,12 +38,20 @@ import { runAllClusterDetections, alertsToOsintClusters } from "./correlationQue
 import { ConfidenceScore, confidenceToLabel } from "../types/confidence";
 import type { OsintResult } from "./osint/providerInterface";
 import { numVerifyLookup, regexPhoneAnalysis } from "./osint/providers/phoneProviders";
-import { razorpayVpaLookup, ifscBankLookup } from "./osint/providers/upiProviders";
+import { razorpayVpaLookup, ifscBankLookup, ifscCodeLookup } from "./osint/providers/upiProviders";
 import { abuseIpDbLookup, regexIpAnalysis } from "./osint/providers/ipProviders";
 import { virusTotalUrlLookup, urlScanLookup, whoisXmlDomainLookup } from "./osint/providers/urlProviders";
 import { hibpLookup, hunterEmailLookup, mxRecordLookup } from "./osint/providers/emailProviders";
 import { cryptoLookup } from "./osint/providers/cryptoProviders";
 import { enrichTelegramEntity } from "./osint/providers/telegramProviders";
+import { waybackLookup } from "./osint/public/wayback";
+import { lookupCertificateHosts } from "./osint/public/certTransparency";
+import {
+  extractGstins,
+  extractPins,
+  lookupPinAssist,
+  merchantAssistLinks,
+} from "./osint/public/indiaAssist";
 import { runWithRetry } from "../utils/stageRunner";
 import { mask } from "../utils/piiSanitizer";
 import { assembleEvidenceCorpus, type EvidenceCorpus } from "../agent/evidenceCorpus";
@@ -109,6 +117,8 @@ const TELEGRAM_RE = /(?<![a-zA-Z0-9])@[A-Za-z0-9_]{5,32}\b/g;
 const USERNAME_LABEL_RE = /\b(?:username|user\s*name|handle|alias)\s*[:=]\s*@?([A-Za-z][A-Za-z0-9_.-]{2,31})\b/gi;
 const USERNAME_SKIP = new Set(["admin", "user", "test", "null", "undefined", "http", "https", "www"]);
 const IFSC_RE = /\b[A-Z]{4}0[A-Z0-9]{6}\b/g;
+/** Landline / STD style e.g. 080-12345678 — kept as phone for assist enrichment */
+const LANDLINE_RE = /\b0\d{2,4}[-\s]?\d{6,8}\b/g;
 
 const PHONE_VALID = /^(?:\+91|0)?[6-9]\d{9}$/;
 const UPI_VALID = /^[a-zA-Z0-9._-]+@[a-zA-Z]{3,}$/;
@@ -171,6 +181,11 @@ export function extractEntitiesFromCorpus(
       const clean = v.replace(/\s+/g, "");
       push("phone", clean, sourceFile, PHONE_VALID.test(clean));
     });
+    (text.match(LANDLINE_RE) ?? []).forEach((v) => {
+      const clean = v.replace(/\s+/g, "");
+      if (seen.has(`phone:${clean.toLowerCase()}`)) return;
+      push("phone", clean, sourceFile, false);
+    });
     (text.match(IPV4_RE) ?? []).forEach((v) => push("ipv4", v, sourceFile, true));
     (text.match(DOMAIN_RE) ?? []).forEach((v) => {
       const s = v.toLowerCase();
@@ -188,11 +203,18 @@ export function extractEntitiesFromCorpus(
       if (!handle || USERNAME_SKIP.has(handle.toLowerCase())) continue;
       push("username", handle, sourceFile, true);
     }
-    // IFSC codes often appear in UPI settlement trails — route through UPI enrichment (bank lookup).
+    // IFSC codes — route through UPI enrichment (IFSC API + bank lookup).
     (text.match(IFSC_RE) ?? []).forEach((v) => {
       const pseudo = `${v.toLowerCase()}@ifsc`;
       if (!seen.has(`upi:${pseudo}`)) push("upi", pseudo, sourceFile, UPI_VALID.test(pseudo));
     });
+    // GSTIN / PIN → username-typed assist tags (no new entity enum).
+    for (const gstin of extractGstins(text)) {
+      push("username", `GSTIN:${gstin}`, sourceFile, true);
+    }
+    for (const pin of extractPins(text)) {
+      push("username", `PIN:${pin}`, sourceFile, true);
+    }
   }
 
   return entities;
@@ -233,6 +255,15 @@ async function safeProviderCall(
  * result if all are UNVERIFIED.
  */
 function bestResult(results: OsintResult[]): OsintResult {
+  if (results.length === 0) {
+    return {
+      success: false,
+      confidence: ConfidenceScore.UNVERIFIED,
+      source: "empty",
+      flags: [],
+      error: "no-provider-results",
+    };
+  }
   return (
     results.reduce<OsintResult | null>((best, r) => {
       if (!best || r.confidence > best.confidence) return r;
@@ -265,12 +296,16 @@ async function enrichOneEntity(entity: IOsintEntity): Promise<{ enrichment: IOsi
       ]);
       break;
 
-    case "upi":
+    case "upi": {
+      const isIfscPseudo = entity.value.toLowerCase().endsWith("@ifsc");
       results = await Promise.all([
-        safeProviderCall("Razorpay", () => razorpayVpaLookup(entity.value)),
-        safeProviderCall("IFSC-directory", () => Promise.resolve(ifscBankLookup(entity.value))),
+        isIfscPseudo
+          ? safeProviderCall("IFSC-API", () => ifscCodeLookup(entity.value))
+          : safeProviderCall("Razorpay", () => razorpayVpaLookup(entity.value)),
+        safeProviderCall("UPI-PSP-map", () => Promise.resolve(ifscBankLookup(entity.value))),
       ]);
       break;
+    }
 
     case "ipv4":
       results = await Promise.all([
@@ -283,15 +318,63 @@ async function enrichOneEntity(entity: IOsintEntity): Promise<{ enrichment: IOsi
       results = await Promise.all([
         safeProviderCall("VirusTotal", () => virusTotalUrlLookup(entity.value)),
         safeProviderCall("URLScan.io", () => urlScanLookup(entity.value)),
+        safeProviderCall("Wayback", () => waybackLookup(entity.value)),
       ]);
       break;
 
     case "domain":
       results = await Promise.all([
-        safeProviderCall("VirusTotal", () => virusTotalUrlLookup(entity.value)),
+        safeProviderCall("VirusTotal", () => virusTotalUrlLookup(`http://${entity.value}`)),
         safeProviderCall("WhoisXML", () => whoisXmlDomainLookup(entity.value)),
+        safeProviderCall("Wayback", () => waybackLookup(entity.value)),
+        safeProviderCall("crt.sh", async () => {
+          const cert = await lookupCertificateHosts(entity.value);
+          const flags = cert.hosts.length ? ["CT_HOSTS_FOUND"] : ["CT_EMPTY"];
+          if (cert.error) flags.push("CT_ERROR");
+          return {
+            success: !cert.error || cert.hosts.length > 0,
+            data: { domain: entity.value, certificateHosts: cert.hosts, error: cert.error ?? null },
+            confidence: cert.hosts.length ? ConfidenceScore.MEDIUM : ConfidenceScore.LOW,
+            source: `crt.sh/${new Date().toISOString()}`,
+            flags,
+            error: cert.error,
+          } satisfies OsintResult;
+        }),
       ]);
       break;
+
+    case "username": {
+      const upper = entity.value.toUpperCase();
+      if (upper.startsWith("GSTIN:")) {
+        const gstin = entity.value.slice(6);
+        results = [
+          {
+            success: true,
+            data: {
+              gstin,
+              assist_links: merchantAssistLinks(gstin),
+              note: "Verify on GST portal / MCA / Zauba — no automated CAPTCHA bypass",
+            },
+            confidence: ConfidenceScore.LOW,
+            source: `gstin-assist/${new Date().toISOString()}`,
+            flags: ["NEEDS_GST_VERIFY", "MERCHANT_ASSIST"],
+          },
+        ];
+      } else if (upper.startsWith("PIN:")) {
+        const pin = entity.value.slice(4);
+        const assist = lookupPinAssist(pin);
+        results = [
+          {
+            success: true,
+            data: assist,
+            confidence: assist.watchBelt ? ConfidenceScore.MEDIUM : ConfidenceScore.LOW,
+            source: `pin-assist/${new Date().toISOString()}`,
+            flags: assist.flags,
+          },
+        ];
+      }
+      break;
+    }
 
     case "email":
       results = await Promise.all([
@@ -324,12 +407,24 @@ async function enrichOneEntity(entity: IOsintEntity): Promise<{ enrichment: IOsi
   const best = bestResult(results);
   const allFlags = [...new Set(results.flatMap((r) => r.flags))];
 
+  // Merge assist deep-links from every provider so they survive when another source wins.
+  const mergedAssist: Record<string, string> = {};
+  for (const r of results) {
+    const data = r.data as Record<string, unknown> | undefined;
+    if (!data) continue;
+    const links = (data.assist_links ?? data.links) as Record<string, string> | undefined;
+    if (links && typeof links === "object") Object.assign(mergedAssist, links);
+    const assist = data.assist as Record<string, string> | undefined;
+    if (assist && typeof assist === "object") Object.assign(mergedAssist, assist);
+  }
+
   const enrichment: IOsintEnrichment = {
     entityId: entity.id,
     source: best.source,
     confidence: scoreToLabel(best.confidence),
     details: {
       ...(best.data ?? {}),
+      ...(Object.keys(mergedAssist).length ? { assist_links: mergedAssist } : {}),
       provider_results: results.map((r) => ({ source: r.source, confidence: r.confidence, flags: r.flags, error: r.error })),
     },
     timestamp: ts,

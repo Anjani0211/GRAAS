@@ -22,7 +22,8 @@ export type AuditAction =
   | "SUPPORT_BOOKING_CREATED"
   | "CASE_ASSIGNED"
   | "SETTINGS_UPDATED"
-  | "ESCALATION_DRAFT";
+  | "ESCALATION_DRAFT"
+  | "ESCALATION_PACK";
 
 export interface IAuditLog extends Document {
   userId: string;
@@ -63,6 +64,7 @@ const AuditLogSchema = new Schema<IAuditLog>(
         "CASE_ASSIGNED",
         "SETTINGS_UPDATED",
         "ESCALATION_DRAFT",
+        "ESCALATION_PACK",
       ],
     },
     resourceId: { type: String, index: true },

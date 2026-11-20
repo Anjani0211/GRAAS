@@ -4,6 +4,7 @@ import type { OsintResult } from "../providerInterface";
 import { logger } from "../../../utils/logger";
 import { mask } from "../../../utils/piiSanitizer";
 import { secrets } from "../../runtimeSettings";
+import { phoneAssistLinks } from "../public/indiaAssist";
 
 /**
  * NumVerify phone validation — carrier, country, line type.
@@ -15,7 +16,6 @@ export async function numVerifyLookup(phone: string): Promise<OsintResult> {
 
   try {
     const normalized = phone.replace(/\D/g, "");
-    // PII: send only last 7 digits to non-Indian third-party API (prefix via country_code).
     const maskedForProvider = normalized.slice(-7);
     const response = await safeHttp.get<Record<string, unknown>>(
       "http://apilayer.net/api/validate",
@@ -30,7 +30,7 @@ export async function numVerifyLookup(phone: string): Promise<OsintResult> {
 
     const flags: string[] = [];
     if (!valid) flags.push("INVALID_NUMBER");
-    if (lineType === "voip") flags.push("VOIP");
+    if (lineType === "voip") flags.push("VOIP", "POSSIBLE_VOIP");
 
     return {
       success: true,
@@ -52,33 +52,58 @@ export async function numVerifyLookup(phone: string): Promise<OsintResult> {
 }
 
 /**
- * Static phone regex analysis — no API key required.
- * Derives operator from Indian mobile prefix.
+ * Static phone analysis + analyst assist deep-links (Sanchar Saathi, Truecaller, dorks).
  */
 export function regexPhoneAnalysis(phone: string): OsintResult {
   const digits = phone.replace(/\D/g, "");
   const cleaned = digits.replace(/^(91|0)/, "");
   const prefix = cleaned.slice(0, 4);
   const operator = INDIAN_PREFIX_MAP[prefix] ?? "Unknown";
-  const valid = /^[6-9]\d{9}$/.test(cleaned);
-  const flags: string[] = [];
-  if (!valid) flags.push("INVALID_FORMAT");
+  const mobileValid = /^[6-9]\d{9}$/.test(cleaned);
+  const assist = phoneAssistLinks(phone);
+  const flags = new Set<string>(assist.flags);
+
+  if (!mobileValid && !flags.has("SERIES_080_LANDLINE_STYLE")) {
+    flags.add("INVALID_FORMAT");
+  }
+  if (operator === "Unknown" && mobileValid) flags.add("UNKNOWN_SERIES");
+
   return {
     success: true,
-    data: { operator, format_valid: valid, digits_cleaned: cleaned },
-    confidence: valid ? ConfidenceScore.LOW : ConfidenceScore.UNVERIFIED,
-    source: `regex-analysis/${new Date().toISOString()}`,
-    flags,
+    data: {
+      operator,
+      format_valid: mobileValid,
+      digits_cleaned: cleaned,
+      series_notes: assist.seriesNotes,
+      assist_links: assist.links,
+      needs_sanchar_check: true,
+    },
+    confidence: mobileValid ? ConfidenceScore.LOW : ConfidenceScore.UNVERIFIED,
+    source: `phone-assist/${new Date().toISOString()}`,
+    flags: [...flags, "NEEDS_SANCHAR_CHECK"],
   };
 }
 
-// Common Indian telecom prefix → operator map
 const INDIAN_PREFIX_MAP: Record<string, string> = {
-  "9999": "Airtel", "9990": "Airtel", "9818": "Airtel", "9810": "Airtel",
-  "9811": "Airtel", "9871": "Airtel", "9868": "Airtel", "9870": "Airtel",
-  "9876": "Jio", "9819": "Jio", "8826": "Jio", "8867": "Jio",
-  "9800": "Vodafone Idea", "9843": "Vodafone Idea", "9867": "Vodafone Idea",
-  "7000": "BSNL", "7001": "BSNL", "9415": "BSNL", "9452": "BSNL",
+  "9999": "Airtel",
+  "9990": "Airtel",
+  "9818": "Airtel",
+  "9810": "Airtel",
+  "9811": "Airtel",
+  "9871": "Airtel",
+  "9868": "Airtel",
+  "9870": "Airtel",
+  "9876": "Jio",
+  "9819": "Jio",
+  "8826": "Jio",
+  "8867": "Jio",
+  "9800": "Vodafone Idea",
+  "9843": "Vodafone Idea",
+  "9867": "Vodafone Idea",
+  "7000": "BSNL",
+  "7001": "BSNL",
+  "9415": "BSNL",
+  "9452": "BSNL",
 };
 
 function noKey(provider: string): OsintResult {

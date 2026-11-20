@@ -32,6 +32,10 @@ const TOOL_LABELS: Record<string, string> = {
   lookup_ip: "IP",
   lookup_telegram_id: "Telegram",
   trace_crypto_wallet: "Wallet",
+  lookup_ifsc: "IFSC",
+  archive_url: "Wayback",
+  cert_transparency: "Cert transparency",
+  india_assist_links: "India assist",
 };
 
 /** One-line hit summary for an OSINT tool result shown on the case page. */
@@ -72,7 +76,40 @@ export function describeEnrichment(
       summary: `${String(d.username ?? "handle")}: ${profiles.length} profiles${profiles.length ? ` (${profiles.slice(0, 3).join(", ")})` : ""}`,
     };
   }
-  const direct = ["phone", "upi", "ip", "url", "domain", "email", "wallet", "telegramId", "username"].find(
+  if (typeof source === "string" && source.startsWith("wayback")) {
+    return {
+      label: "Wayback",
+      summary: d.available
+        ? `snapshot ${String(d.archive_url ?? "").slice(0, 80)}`
+        : "no snapshot",
+    };
+  }
+  if (typeof source === "string" && (source.startsWith("ifsc") || source.includes("ifsc.razorpay"))) {
+    return {
+      label: "IFSC",
+      summary: [d.bank, d.branch, d.ifsc].filter(Boolean).map(String).join(" · ") || "IFSC lookup",
+    };
+  }
+  if (typeof source === "string" && source.startsWith("gstin-assist")) {
+    return { label: "GSTIN assist", summary: String(d.gstin ?? "merchant") };
+  }
+  if (typeof source === "string" && source.startsWith("pin-assist")) {
+    return {
+      label: "PIN assist",
+      summary: [d.pin, d.district, d.state, d.watchBelt ? "WATCH" : ""].filter(Boolean).map(String).join(" · "),
+    };
+  }
+  if (typeof source === "string" && source.startsWith("phone-assist")) {
+    return {
+      label: "Phone assist",
+      summary: [d.operator, d.format_valid === false ? "invalid" : "ok"].filter(Boolean).map(String).join(" · "),
+    };
+  }
+  if (typeof source === "string" && source.startsWith("crt.sh")) {
+    const hosts = detailStrings(d, "certificateHosts");
+    return { label: "crt.sh", summary: `${hosts.length} hosts${hosts.length ? `: ${hosts.slice(0, 3).join(", ")}` : ""}` };
+  }
+  const direct = ["phone", "upi", "ip", "url", "domain", "email", "wallet", "telegramId", "username", "bank", "bank_name"].find(
     (key) => typeof d[key] === "string",
   );
   return { label, summary: direct ? String(d[direct]) : label };

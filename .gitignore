@@ -52,3 +52,5 @@ grass_*_data/
 
 api/.node-bin/
 api/.mongo-bin/
+
+.vercel

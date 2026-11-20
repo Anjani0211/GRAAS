@@ -586,6 +586,20 @@ export const triageApi = {
   },
 };
 
+export type EscalationPack = {
+  caseNumber: string;
+  category: string;
+  status: string;
+  generatedAt: string;
+  entities: Array<{ type: string; value: string; flags?: string[] }>;
+  evidenceHashes: Array<{ fileName: string; sha256: string; sizeBytes?: number }>;
+  enrichmentsSummary: Array<{ entityId: string; source: string; confidence: string; highlight: string }>;
+  relatedCases: string[];
+  assistPortals: Array<{ id: string; label: string; url: string; note: string }>;
+  analystChecklist: string[];
+  deepLinks: Record<string, string>;
+};
+
 export const escalationApi = {
   create(data: { caseId: string; actionType: string; platformTarget?: string; templateUsed?: string }) {
     return apiFetch<{ status: string; actionType: string; message: string; template?: { subject: string; body: string } }>(
@@ -596,6 +610,10 @@ export const escalationApi = {
 
   getTemplates() {
     return apiFetch<{ templates: { id: string; subject: string }[] }>("/escalation/templates");
+  },
+
+  getPack(caseId: string) {
+    return apiFetch<EscalationPack>(`/escalation/pack/${encodeURIComponent(caseId)}`);
   },
 };
 
