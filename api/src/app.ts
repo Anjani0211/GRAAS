@@ -21,6 +21,7 @@ import { scheduleRetentionJob } from "./jobs/retentionJob";
 import { isLlmConfigured, getLlmModel } from "./services/llmClient";
 import { getEffectiveLlm, refreshRuntimeSettings } from "./services/runtimeSettings";
 import { csrfProtection } from "./middleware/csrf";
+import { seedOnBootIfConfigured } from "./services/seedOnBoot";
 
 const app = express();
 
@@ -72,6 +73,7 @@ app.use((_req, res) => {
 async function start(): Promise<void> {
   validateSecurityConfig();
   await connectDatabase();
+  await seedOnBootIfConfigured();
   await refreshRuntimeSettings();
   await redisClient.connect();
   if (
